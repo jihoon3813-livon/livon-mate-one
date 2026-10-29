@@ -7098,24 +7098,6 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
 
   // 1. 간병인 배정 데이터 확인 및 정렬
   let sortedAssigns = (appAssigns || []).slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
-  // [목록-모달 일관성 보장]: 배정대장에 행이 없더라도 신청서(app) 자체에 간병인명이 기재되어 있는 경우 가상 배정 객체 생성
-  if (sortedAssigns.length === 0 && app && app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정') && !app.caregiverName.includes('배정대기')) {
-    const rawWage = app.dailyWage || app.dailyRate || 140000;
-    const numWage = typeof rawWage === 'string' ? (parseInt(rawWage.replace(/[^0-9]/g, ''), 10) || 140000) : (Number(rawWage) || 140000);
-    const resolvedCenter = app.caregiverCenter || app.centerName || '개인';
-    sortedAssigns = [{
-      id: 'AS-' + (app.id || 'TEMP'),
-      applyId: app.id,
-      patientName: app.patientName,
-      caregiverName: app.caregiverName,
-      phone: app.caregiverPhone || app.phone || '',
-      centerName: resolvedCenter,
-      settlementType: app.settlementType || (resolvedCenter.includes('개인') ? '개인' : '협력센터'),
-      dailyWage: numWage,
-      startDate: app.serviceStartDate || app.careStartDate || app.startDate || '',
-      endDate: app.serviceEndDate || app.careEndDate || app.endDate || ''
-    }];
-  }
   const hasAssign = sortedAssigns.length > 0;
   
   let as = null;
@@ -8882,24 +8864,6 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
   // 1. 간병인 배정 데이터 확인 및 차수별 정렬 (startDate 오름차순)
   let sortedAssigns = (appAssigns || []).slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
-  // [목록-모달 일관성 보장]: 배정대장에 행이 없더라도 신청서(app) 자체에 간병인명이 기재되어 있는 경우 가상 배정 객체 생성
-  if (sortedAssigns.length === 0 && app && app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정') && !app.caregiverName.includes('배정대기')) {
-    const rawWage = app.dailyWage || app.dailyRate || 140000;
-    const numWage = typeof rawWage === 'string' ? (parseInt(rawWage.replace(/[^0-9]/g, ''), 10) || 140000) : (Number(rawWage) || 140000);
-    const resolvedCenter = app.caregiverCenter || app.centerName || '개인';
-    sortedAssigns = [{
-      id: 'AS-' + (app.id || 'TEMP'),
-      applyId: app.id,
-      patientName: app.patientName,
-      caregiverName: app.caregiverName,
-      phone: app.caregiverPhone || app.phone || '',
-      centerName: resolvedCenter,
-      settlementType: app.settlementType || (resolvedCenter.includes('개인') ? '개인' : '협력센터'),
-      dailyWage: numWage,
-      startDate: app.serviceStartDate || app.careStartDate || app.startDate || '',
-      endDate: app.serviceEndDate || app.careEndDate || app.endDate || ''
-    }];
-  }
   const hasAssign = sortedAssigns.length > 0;
   
   // 현재 선택된 간병인 탭 매칭 (없거나 유효하지 않으면 가장 최신 배정 건을 기본값으로 설정)
@@ -13855,7 +13819,7 @@ function renderUnifiedCareHub() {
     try {
     const isChecked = gSelectedAppIds.has(app.id) ? 'checked' : '';
 
-    const appAssigns = getAppAssignsHelper(app);
+    const appAssigns = gConvexDataApplied ? getAppAssignsHelper(app) : [];
     const appClaims = getAppClaimsHelper(app);
     const appPayouts = getAppPayoutsHelper(app);
     const appLogs = logsMap.get(app.id) || [];
@@ -13866,18 +13830,6 @@ function renderUnifiedCareHub() {
     let as = (typeof getActiveCaregiverAssignment === 'function')
       ? getActiveCaregiverAssignment(app, appAssigns)
       : (appAssigns.length > 0 ? appAssigns[appAssigns.length - 1] : null);
-    if (!as && app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정') && !app.caregiverName.includes('배정대기')) {
-      as = {
-        applyId: app.id,
-        caregiverName: app.caregiverName,
-        phone: app.caregiverPhone || app.phone || '',
-        centerName: app.caregiverCenter || app.centerName || '협력센터',
-        dailyWage: app.dailyWage || 150000,
-        startDate: app.serviceStartDate || app.careStartDate || app.startDate || '',
-        endDate: app.serviceEndDate || app.careEndDate || app.endDate || ''
-      };
-    }
-
     const s2_assign = as 
       ? { label: maskName(as.caregiverName) + ' 배정 (' + (as.centerName || '개인') + ')', color: 'emerald', count: Math.max(appAssigns.length, 1) }
       : (app.status === '완료' || app.status === '정산완료' 
@@ -14562,8 +14514,15 @@ function applyHubCustomerDetailSnapshot(appId, detail) {
   if (appIndex < 0) return false;
 
   gApps[appIndex] = detail.application;
-  const hasApplyId = item => item && (String(item.applyId) === String(appId) || String(item.id) === String(appId));
-  gAssigns = replaceRelated(gAssigns, detail.assignments, hasApplyId);
+  const normalizeApplyId = value => String(value || '').trim().replace(/^H/, 'C');
+  const hasApplyId = item => item && (
+    normalizeApplyId(item.applyId) === normalizeApplyId(appId) ||
+    normalizeApplyId(item.id) === normalizeApplyId(appId)
+  );
+  gAssigns = [
+    ...(Array.isArray(gAssigns) ? gAssigns.filter(item => !hasApplyId(item)) : []),
+    ...(Array.isArray(detail.assignments) ? detail.assignments : [])
+  ];
   gClaims = replaceRelated(gClaims, detail.claims, hasApplyId);
   gPayouts = replaceRelated(gPayouts, detail.payouts, hasApplyId);
   gCareLogs = replaceRelated(gCareLogs, detail.careLogs, hasApplyId);
@@ -14765,6 +14724,45 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
     }
   }
 
+ const modalRenderApp = { ...app };
+  let sourceCtiLogs = (window.gTotalCallData && Array.isArray(window.gTotalCallData.callLogs))
+    ? window.gTotalCallData.callLogs
+    : ((typeof gTotalCallData !== 'undefined' && gTotalCallData && Array.isArray(gTotalCallData.callLogs)) ? gTotalCallData.callLogs : []);
+  if (sourceCtiLogs.length === 0) {
+    try {
+      const cachedCti = localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA') || sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+      if (cachedCti) {
+        const parsedCti = JSON.parse(cachedCti);
+        const cachedData = (parsedCti && parsedCti.data && Array.isArray(parsedCti.data.callLogs)) ? parsedCti.data : parsedCti;
+        if (cachedData && Array.isArray(cachedData.callLogs)) sourceCtiLogs = cachedData.callLogs;
+      }
+    } catch (e) {}
+  }
+  const normalizeCtiApplyId = value => String(value || '').trim().replace(/^H/, 'C');
+  const modalAppId = normalizeCtiApplyId(app.id || app.patientId);
+  const appPhones = [...new Set([
+    app.phone, app.guardianPhone, app.contactPhone, app.subPhone, app.tel, app.applicantPhone
+  ].map(value => String(value || '').replace(/\D/g, '')).filter(value => value.length >= 8))];
+  const phoneOwnerCounts = new Map();
+  (Array.isArray(gApps) ? gApps : []).forEach(customer => {
+    if (!customer) return;
+    const customerPhones = new Set([
+      customer.phone, customer.guardianPhone, customer.contactPhone, customer.subPhone, customer.tel, customer.applicantPhone
+    ].map(value => String(value || '').replace(/\D/g, '')).filter(value => value.length >= 8));
+    customerPhones.forEach(phone => phoneOwnerCounts.set(phone, (phoneOwnerCounts.get(phone) || 0) + 1));
+  });
+  const scopedCtiLogs = sourceCtiLogs.filter(call => {
+    if (!call) return false;
+    const explicitApplyId = call.applyId || call.appId || call.applicationId || call.targetAppId;
+    if (explicitApplyId) return normalizeCtiApplyId(explicitApplyId) === modalAppId;
+    const callPhone = String(call.phone || call.rawPhone || '').replace(/\D/g, '');
+    return appPhones.includes(callPhone) && phoneOwnerCounts.get(callPhone) === 1;
+  });
+  modalRenderApp._cachedMatchedCallLogs = scopedCtiLogs;
+  modalRenderApp._cachedCallLogsRef = sourceCtiLogs;
+  modalRenderApp._cachedPhoneKey = String(modalRenderApp.phone || '');
+  modalRenderApp._cachedNameKey = String(modalRenderApp.patientName || '');
+
   const titleEl = document.getElementById('hubDetailModalTitle');
   const bodyEl = document.getElementById('hubDetailModalBody');
   const btnTimeline = document.getElementById('btnHubViewTimeline');
@@ -14848,55 +14846,23 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
       const getModalEntityList = (rawList, targetApp) => {
         if (!targetApp || !Array.isArray(rawList)) return [];
         const appId = String(targetApp.id || targetApp.patientId || '').trim();
-        const appName = (targetApp.patientName || targetApp.customerName || '').trim();
-
         const normalizeApplyId = value => String(value || '').trim().replace(/^H/, 'C');
 
-        let matches = rawList.filter(item => {
+        const matches = rawList.filter(item => {
           if (!item) return false;
-          const aId = String(item.applyId || '').trim();
-          if (aId) return Boolean(appId && normalizeApplyId(aId) === normalizeApplyId(appId));
-          return typeof isMatchCustomerRecord === 'function' && isMatchCustomerRecord(targetApp, item);
+          const itemApplyId = String(item.applyId || (item.isApplication ? item.id : '') || '').trim();
+          return Boolean(itemApplyId && appId && normalizeApplyId(itemApplyId) === normalizeApplyId(appId));
         });
-
-        if (matches.length === 0 && appName) {
-          matches = rawList.filter(item => {
-            if (!item) return false;
-            if (String(item.applyId || '').trim()) return false;
-            const pName = (item.patientName || item.customerName || '').trim();
-            return pName === appName;
-          });
-        }
         return matches;
       };
 
-      let assigns = getModalEntityList(gAssigns, app);
-      // 3단계: 배정대장(gAssigns)에 매칭 레코드가 없지만 신청서 자체에 간병인 정보가 기재된 경우 가상 배정 보강
-      if (assigns.length === 0 && app && app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정') && !app.caregiverName.includes('배정대기')) {
-        const rawWage = app.dailyWage || app.dailyRate || 140000;
-        const numWage = typeof rawWage === 'string' ? (parseInt(rawWage.replace(/[^0-9]/g, ''), 10) || 140000) : (Number(rawWage) || 140000);
-        const resolvedCenter = app.caregiverCenter || app.centerName || '개인';
-        assigns = [{
-          id: 'AS-' + (app.id || 'TEMP'),
-          applyId: app.id,
-          patientName: app.patientName,
-          caregiverName: app.caregiverName,
-          phone: app.caregiverPhone || app.phone || '',
-          centerName: resolvedCenter,
-          settlementType: app.settlementType || (resolvedCenter.includes('개인') ? '개인' : '협력센터'),
-          dailyWage: numWage,
-          startDate: app.serviceStartDate || app.careStartDate || app.startDate || '',
-          endDate: app.serviceEndDate || app.careEndDate || app.endDate || ''
-        }];
-      }
+      const assigns = (!skipRemoteRefresh && app && !app.isPreRegistered)
+        ? []
+        : getModalEntityList(gAssigns, app);
 
       const claims = getModalEntityList(gClaims, app);
       const payouts = getModalEntityList(gPayouts, app);
-      const logs = (gCareLogs || []).filter(item => {
-        if (!item) return false;
-        if (typeof isMatchCustomerRecord === 'function' && isMatchCustomerRecord(app, item)) return true;
-        return String(item.applyId || '').trim() === String(app.id || '').trim();
-      });
+      const logs = getModalEntityList(gCareLogs, app);
       const rawFax = (gFaxRecords && gFaxRecords[app.id]);
       const isClaimFax = rawFax && rawFax.status === '전송완료' && rawFax.caseType !== '현대해상 고객등록/조회' && rawFax.formType !== 'HD_FORM_01';
       const faxInfo = isClaimFax ? rawFax : { status: '미전송', sentDate: null, faxNumber: app.adjusterFax || '0507-XXX-XXXX' };
@@ -14904,9 +14870,9 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
 
       let mainWorkspaceHtml = '';
       if (gHubModalViewMode === '3card') {
-        mainWorkspaceHtml = renderEntityBased3CardWorkspaceHtml(app, assigns, claims, payouts, logs, faxInfo, isVoiceSyncOn);
+        mainWorkspaceHtml = renderEntityBased3CardWorkspaceHtml(modalRenderApp, assigns, claims, payouts, logs, faxInfo, isVoiceSyncOn);
       } else {
-        mainWorkspaceHtml = renderSequentialCareSettlementWorkspaceHtml(app, assigns, claims, payouts, logs, faxInfo, isVoiceSyncOn);
+        mainWorkspaceHtml = renderSequentialCareSettlementWorkspaceHtml(modalRenderApp, assigns, claims, payouts, logs, faxInfo, isVoiceSyncOn);
       }
 
       // 사전등록 건인 경우 상단 안내 배너 및 정식 신청서 등록 전환 액션바 부착
@@ -14961,7 +14927,7 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
       let ctiSectionHtml = '';
       if (typeof renderHubCustomerCtiSectionHtml === 'function') {
         try {
-          ctiSectionHtml = renderHubCustomerCtiSectionHtml(app);
+          ctiSectionHtml = renderHubCustomerCtiSectionHtml(modalRenderApp);
         } catch (ctiErr) {
           console.warn('CTI Section render error:', ctiErr);
         }
