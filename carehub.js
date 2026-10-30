@@ -334,22 +334,12 @@ window.resolveAppApplyDateTime = resolveAppApplyDateTime;
 
 function findCaregiverProfileForAssignment(assignment) {
   if (!assignment || !Array.isArray(gCaregivers)) return null;
-  const caregiverName = String(assignment.caregiverName || '').trim();
   const caregiverId = String(assignment.caregiverId || assignment.caregiverID || assignment.cgId || '').trim();
   if (caregiverId) {
     const byId = gCaregivers.find(c => c && String(c.id || '').trim() === caregiverId);
     if (byId) return byId;
   }
-
-  const assignmentPhone = String(assignment.phone || assignment.caregiverPhone || '').replace(/\D/g, '');
-  if (assignmentPhone) {
-    const byPhone = gCaregivers.filter(c => c && (!caregiverName || String(c.name || '').trim() === caregiverName)
-      && String(c.phone || '').replace(/\D/g, '') === assignmentPhone);
-    if (byPhone.length === 1) return byPhone[0];
-  }
-
-  const byUniqueName = gCaregivers.filter(c => c && String(c.name || '').trim() === caregiverName);
-  return byUniqueName.length === 1 ? byUniqueName[0] : null;
+  return null;
 }
 
 function parseCareDateTime(dateTimeStr) {
@@ -7113,10 +7103,9 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
 
   const prog = as ? getCareProgressInfo(as) : null;
   const cg = as ? findCaregiverProfileForAssignment(as) : null;
-  const center = as ? (gCenters || []).find(ctr => ctr.name === (as.centerName || (app && (app.caregiverCenter || app.centerName)))) : null;
   const birth = as ? (as.birthDate || as.caregiverBirth || (cg && cg.birthDate) || '-') : '-';
-  const caregiverPhone = as ? (as.phone || as.caregiverPhone || (app && app.caregiverPhone) || (cg && cg.phone) || '-') : '-';
-  const centerPhone = as ? (as.centerPhone || (center && center.phone) || '02-2633-1120') : '-';
+  const caregiverPhone = as ? (as.phone || as.caregiverPhone || (cg && cg.phone) || '-') : '-';
+  const centerPhone = as ? (as.centerPhone || '-') : '-';
   const account = as ? (as.accountInfo || (cg && cg.account) || '-') : '-';
   const cgDailyWage = as ? (as.dailyWage || 140000) : 140000;
 
@@ -8880,10 +8869,9 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
   const prog = as ? getCareProgressInfo(as) : null;
   const cg = as ? findCaregiverProfileForAssignment(as) : null;
-  const center = as ? (gCenters || []).find(ctr => ctr.name === (as.centerName || (app && (app.caregiverCenter || app.centerName)))) : null;
   const birth = as ? (as.birthDate || as.caregiverBirth || (cg && cg.birthDate) || '-') : '-';
-  const caregiverPhone = as ? (as.phone || as.caregiverPhone || (app && app.caregiverPhone) || (cg && cg.phone) || '-') : '-';
-  const centerPhone = as ? (as.centerPhone || (center && center.phone) || '02-2633-1120') : '-';
+  const caregiverPhone = as ? (as.phone || as.caregiverPhone || (cg && cg.phone) || '-') : '-';
+  const centerPhone = as ? (as.centerPhone || '-') : '-';
   const account = as ? (as.accountInfo || (cg && cg.account) || '-') : '-';
 
   // 2. 통합 정산 스케줄 엔진 구동 (환자의 전체 간병 여정에 대한 정산 스케줄 계산)
@@ -14850,7 +14838,7 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
 
         const matches = rawList.filter(item => {
           if (!item) return false;
-          const itemApplyId = String(item.applyId || (item.isApplication ? item.id : '') || '').trim();
+          const itemApplyId = String(item.applyId || '').trim();
           return Boolean(itemApplyId && appId && normalizeApplyId(itemApplyId) === normalizeApplyId(appId));
         });
         return matches;
