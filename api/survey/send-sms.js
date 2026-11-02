@@ -153,6 +153,7 @@ module.exports = async (req, res) => {
           buttonTitle,
           subject,
           category: payload.isNewSurvey ? 'SURVEY_NEW_SMS' : 'SURVEY_SMS',
+          testMode: 'PRODUCTION',
           apiKey,
           userId,
           senderKey,

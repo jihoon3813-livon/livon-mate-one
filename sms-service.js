@@ -789,7 +789,7 @@ async function sendViaBarobillKakao({
     <YellowId>${escapeXml(effectiveChannel)}</YellowId>
     <TemplateName>${escapeXml(effectiveTemplate)}</TemplateName>
     <SendDT></SendDT>
-    <SmsReply>${fallbackToSms ? 'A' : 'N'}</SmsReply>
+    <SmsReply>N</SmsReply>
     <SmsSenderNum>${cleanFrom}</SmsSenderNum>
     <KakaotalkMessage>
       <ReceiverName>${escapeXml(toName || patientName)}</ReceiverName>
@@ -837,23 +837,26 @@ async function sendViaBarobillKakao({
   }
 
   // 알림톡 템플릿/채널 미등록 상태이거나 실패한 경우,
-  // 2차: 안전하게 바로빌 문자(LMS/SMS)로 자동 Fallback 전송!
+  // 2차: 안전하게 알리고 공식 문자(LMS/SMS)로 자동 Fallback 전송!
   if (fallbackToSms) {
-    console.log('[Barobill Kakao Fallback to Real SMS/LMS Activated]');
-    const fallbackMessage = message + (buttonUrl ? `\n\n▶ 간병일지 바로보기:\n${buttonUrl}` : '');
-    const smsResult = await sendViaBarobill({
-      toPhone: cleanTo,
-      toName,
-      message: fallbackMessage,
-      senderNumber: cleanFrom,
-      subject: title
-    });
-    return {
-      ...smsResult,
-      fallbackUsed: true,
-      sendType: `FALLBACK_${smsResult.sendType}`,
-      notice: `카카오 알림톡(${lastBaroError ? lastBaroError.message : '채널/템플릿 미승인'}) 사유로 바로빌 공식 문자로 즉시 대체 발송되었습니다.`
-    };
+    console.log('[Barobill Kakao Fallback to Aligo SMS/LMS Activated]');
+    try {
+      const fallbackMessage = message + (buttonUrl ? `\n\n▶ 간병일지 바로보기:\n${buttonUrl}` : '');
+      const smsResult = await sendViaAligo({
+        toPhone: cleanTo,
+        toName,
+        message: fallbackMessage,
+        subject: title
+      });
+      return {
+        ...smsResult,
+        fallbackUsed: true,
+        sendType: `FALLBACK_ALIGO_${smsResult.sendType || 'LMS'}`,
+        notice: `카카오 알림톡(${lastBaroError ? lastBaroError.message : '미승인'}) 사유로 알리고 공식 문자로 즉시 대체 발송되었습니다.`
+      };
+    } catch (aligoErr) {
+      console.warn('[Aligo Fallback Error]', aligoErr.message);
+    }
   }
 
   if (lastBaroError) throw lastBaroError;
