@@ -2229,19 +2229,25 @@ function renderSurveyTargetsTable(list) {
       } else if (isCandidate) {
         candidateCellHtml = `
           <button type="button" onclick="toggleSurveyCandidate('${target.id}')" 
-            class="px-2.5 py-1 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 text-white font-black text-[11px] shadow-2xs flex items-center gap-1 mx-auto cursor-pointer hover:opacity-90 transition-all" 
-            title="클릭하여 발송 후보 지정 해제">
-            <i data-lucide="check" class="w-3 h-3"></i>
-            <span>후보선택</span>
+            class="group px-2.5 py-1 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-rose-800 text-white font-black text-[11px] shadow-2xs flex items-center justify-center gap-1 mx-auto cursor-pointer transition-all min-w-[76px]" 
+            title="클릭 시 발송 후보에서 제외됩니다">
+            <span class="inline-flex items-center gap-1 group-hover:hidden">
+              <i data-lucide="check" class="w-3 h-3"></i>
+              <span>후보담김</span>
+            </span>
+            <span class="hidden group-hover:inline-flex items-center gap-1 text-pink-100">
+              <i data-lucide="x" class="w-3 h-3"></i>
+              <span>후보해제</span>
+            </span>
           </button>
         `;
       } else {
         candidateCellHtml = `
           <button type="button" onclick="toggleSurveyCandidate('${target.id}')" 
-            class="px-2 py-1 rounded-xl bg-white hover:bg-pink-50 text-slate-600 hover:text-rose-700 border border-slate-300 font-semibold text-[11px] flex items-center gap-1 mx-auto cursor-pointer shadow-3xs transition-all" 
-            title="클릭하여 발송 후보로 지정">
+            class="px-2 py-1 rounded-xl bg-white hover:bg-pink-50 text-slate-600 hover:text-rose-700 border border-slate-300 font-semibold text-[11px] flex items-center justify-center gap-1 mx-auto cursor-pointer shadow-3xs transition-all min-w-[76px]" 
+            title="클릭하여 발송 후보 바구니에 담기">
             <i data-lucide="plus" class="w-3 h-3 text-slate-400"></i>
-            <span>후보추가</span>
+            <span>후보담기</span>
           </button>
         `;
       }
