@@ -5684,11 +5684,19 @@
                 </button>
               </div>
 
-              <button type="button" onclick="resetSurveyFilters()" 
-                class="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 flex items-center gap-1 transition-all cursor-pointer">
-                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-                <span>필터 초기화</span>
-              </button>
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="syncCompletedTargetsFromHub(false)" 
+                  class="px-3 py-1.5 rounded-xl text-xs font-black text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 transition-all cursor-pointer shadow-3xs hover:shadow-2xs" 
+                  title="통합허브에서 방금 종료된 최신 고객 명단을 실시간으로 가져옵니다">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-emerald-600"></i>
+                  <span>종료고객 실시간 동기화</span>
+                </button>
+                <button type="button" onclick="resetSurveyFilters()" 
+                  class="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 flex items-center gap-1 transition-all cursor-pointer">
+                  <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                  <span>필터 초기화</span>
+                </button>
+              </div>
             </div>
 
             <!-- 1-2. 스마트 후보 선별 & 일괄 발송 액션 바 (NEW) -->

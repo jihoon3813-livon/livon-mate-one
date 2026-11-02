@@ -1737,6 +1737,227 @@ function updateSidebarSurveyBadge() {
 // 2. 전체 탭 렌더링 (만족도 조사 메뉴 클릭 시 자동 조회 및 로딩 표시)
 // =========================================================================
 let gIsRenderingSurveyTab = false;
+
+// =========================================================================
+// 0-SYNC. 통합허브(CareHub) 간병종료 고객 실시간 동기화 엔진
+// =========================================================================
+async function syncCompletedTargetsFromHub(isSilent = false) {
+  try {
+    // 1. 전역 신청 데이터(applications) 및 배정 데이터(assignments) 수집
+    let allApps = typeof getGlobalApplicationsList === 'function' ? getGlobalApplicationsList() : [];
+    let allAssigns = typeof getGlobalAssignmentsList === 'function' ? getGlobalAssignmentsList() : [];
+
+    // 2. Convex 클라우드 DB에서 실시간 최신 번들 조회 (클라이언트 메모리에 아직 미반영된 최신 등록 건도 완벽 수집)
+    if (typeof queryConvex === 'function') {
+      try {
+        const bundle = await queryConvex('sync:bundleAll', {});
+        if (bundle && Array.isArray(bundle.applications)) {
+          const appMap = new Map();
+          (allApps || []).forEach(a => { if (a && a.id) appMap.set(String(a.id), a); });
+          bundle.applications.forEach(a => { if (a && a.id) appMap.set(String(a.id), a); });
+          allApps = Array.from(appMap.values());
+        }
+        if (bundle && Array.isArray(bundle.assignments)) {
+          const asMap = new Map();
+          (allAssigns || []).forEach(a => { if (a && (a.id || a.applyId)) asMap.set(String(a.id || (a.applyId + '_' + a.caregiverName)), a); });
+          bundle.assignments.forEach(a => { if (a && (a.id || a.applyId)) asMap.set(String(a.id || (a.applyId + '_' + a.caregiverName)), a); });
+          allAssigns = Array.from(asMap.values());
+        }
+      } catch (cvxErr) {
+        console.warn('[SurveySync] Convex bundleAll query error:', cvxErr);
+      }
+    }
+
+    if (!Array.isArray(allApps) || allApps.length === 0) {
+      if (!isSilent && typeof showToast === 'function') {
+        showToast('동기화할 통합허브 고객 신청 데이터가 없습니다.', 'info');
+      }
+      return { addedCount: 0, totalCount: (gSurveyState.targets || []).length };
+    }
+
+    const now = new Date();
+    const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const safeParseDate = (str) => {
+      if (!str) return null;
+      if (str instanceof Date) return isNaN(str.getTime()) ? null : str;
+      const s = String(str).trim();
+      const match = s.match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})(?:[.\sT]+(\d{1,2}):(\d{1,2}))?/);
+      if (match) {
+        const y = parseInt(match[1], 10);
+        const m = parseInt(match[2], 10) - 1;
+        const d = parseInt(match[3], 10);
+        const hh = match[4] !== undefined ? parseInt(match[4], 10) : 0;
+        const mm = match[5] !== undefined ? parseInt(match[5], 10) : 0;
+        return new Date(y, m, d, hh, mm);
+      }
+      // "10.07 09:00 ~ 11.01 09:00" 형태에서 종료일 추출
+      const rangeMatch = s.match(/(?:~\s*)?(\d{1,2})[.-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2}))?$/);
+      if (rangeMatch) {
+        const y = now.getFullYear();
+        const m = parseInt(rangeMatch[1], 10) - 1;
+        const d = parseInt(rangeMatch[2], 10);
+        const hh = rangeMatch[3] !== undefined ? parseInt(rangeMatch[3], 10) : 0;
+        const mm = rangeMatch[4] !== undefined ? parseInt(rangeMatch[4], 10) : 0;
+        return new Date(y, m, d, hh, mm);
+      }
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    // 기존 등록된 대상자 ID 및 서비스ID 목록 Set 구축
+    const existingIds = new Set();
+    (gSurveyState.targets || []).forEach(t => {
+      if (t.id) existingIds.add(String(t.id).trim());
+      if (t.serviceId) existingIds.add(String(t.serviceId).trim());
+    });
+    try {
+      const deletedArr = JSON.parse(localStorage.getItem('LIVON_SURVEY_DELETED_IDS') || '[]');
+      if (Array.isArray(deletedArr)) {
+        deletedArr.forEach(id => existingIds.add(String(id).trim()));
+      }
+    } catch (_) {}
+
+    const newlyAddedTargets = [];
+
+    for (const app of allApps) {
+      if (!app || !app.patientName) continue;
+      const appId = String(app.id || '').trim();
+      if (!appId || existingIds.has(appId) || existingIds.has('ST-' + appId)) continue;
+
+      const st = String(app.status || '').trim();
+      if (st === '취소' || st === '신청취소' || st === '접수취소') continue;
+
+      // 해당 신청 건의 배정 조회
+      const appAssigns = (allAssigns || []).filter(a => a && (String(a.applyId || a.id).trim() === appId || (a.patientName && String(a.patientName).trim() === String(app.patientName).trim())));
+      const latestAssign = appAssigns.length > 0 ? appAssigns[appAssigns.length - 1] : null;
+
+      // 실제 간병 상태 판정
+      let isEnded = false;
+      let realStatus = '';
+      if (typeof determineRealCareStatus === 'function') {
+        try {
+          realStatus = determineRealCareStatus(app, appAssigns);
+        } catch (_) {}
+      }
+
+      if (['완료', '정산완료', '종료', '간병종료', '종결', '진행완료'].includes(realStatus) ||
+          ['완료', '정산완료', '종료', '간병종료'].includes(st)) {
+        isEnded = true;
+      } else {
+        // 날짜 기준 종료 여부 판정 (배정 종료일 또는 신청서 종료일)
+        const endDateRaw = (latestAssign && (latestAssign.endDate || latestAssign.workEndDate)) ||
+                           app.careEndDate || app.serviceEndDate || app.expectedEndDate || app.endDate || '';
+        const parsedEndDate = safeParseDate(endDateRaw);
+        if (parsedEndDate) {
+          const endZero = new Date(parsedEndDate.getFullYear(), parsedEndDate.getMonth(), parsedEndDate.getDate());
+          if (endZero < todayZero || (endZero.getTime() === todayZero.getTime() && parsedEndDate <= now)) {
+            isEnded = true;
+          }
+        }
+      }
+
+      if (isEnded) {
+        existingIds.add(appId);
+        existingIds.add('ST-' + appId);
+
+        let rawToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        try {
+          if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+            rawToken = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('');
+          }
+        } catch (_) {}
+
+        const cleanHosp = cleanSurveyHospitalName(app.hospitalName || app.addressDetail || app.hospitalRoadAddress || (latestAssign && latestAssign.hospitalName) || '', app);
+        const startDateStr = formatSurveyDate(app.careStartDate || app.serviceStartDate || (latestAssign && latestAssign.startDate) || app.applyDate);
+        const endDateStr = formatSurveyDate((latestAssign && (latestAssign.endDate || latestAssign.workEndDate)) || app.careEndDate || app.serviceEndDate || app.expectedEndDate);
+
+        const newTarget = {
+          id: 'ST-' + appId,
+          serviceId: appId,
+          patientName: String(app.patientName).replace(/[\uFFFD]+/g, '').trim(),
+          patientPhone: String(app.phone || app.patientPhone || app.applicantContact || app.contact || '').trim(),
+          hospitalName: cleanHosp,
+          careStartDate: startDateStr,
+          careEndDate: endDateStr,
+          caregiverName: String((latestAssign && latestAssign.caregiverName) || app.caregiverName || '담당간병인').replace(/[\uFFFD]+/g, '').trim(),
+          caregiverPhone: String((latestAssign && latestAssign.caregiverPhone) || app.caregiverPhone || '').trim(),
+          insuranceCompany: String(app.insuranceCompany || app.company || '').trim(),
+          dueAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+          targetStatus: 'ACTIVE',
+          guidanceStatus: 'NOT_STARTED',
+          responseStatus: 'NOT_STARTED',
+          followupStatus: 'NONE',
+          rewardStatus: 'NONE',
+          token: rawToken,
+          tokenHash: rawToken,
+          guidanceRecord: null,
+          responseId: null,
+          revision: 1,
+          createdAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          isRecentlyAdded: true
+        };
+
+        newlyAddedTargets.push(newTarget);
+      }
+    }
+
+    if (newlyAddedTargets.length > 0) {
+      // 1) Convex Cloud DB에 영구 저장
+      if (typeof syncToConvex === 'function') {
+        try {
+          await syncToConvex('sync:saveSurveyTargetsBatch', { targets: newlyAddedTargets });
+          console.log(`[SurveySync] Convex Cloud에 신규 종료 고객 ${newlyAddedTargets.length}건 영구 저장 완료`);
+        } catch (cvxErr) {
+          console.warn('[SurveySync] Convex batch save error:', cvxErr);
+        }
+      }
+
+      // 2) 로컬 인메모리 및 로컬스토리지 즉시 반영
+      if (!Array.isArray(gSurveyState.targets)) gSurveyState.targets = [];
+      newlyAddedTargets.forEach(nt => {
+        gSurveyState.targets.unshift(nt);
+      });
+
+      try {
+        localStorage.setItem('LIVON_SURVEY_TARGETS', JSON.stringify(gSurveyState.targets));
+      } catch (_) {}
+
+      // 3) 화면 및 KPI 즉시 갱신
+      updateSurveyChipCounts();
+      if (typeof renderSurveyKpis === 'function') renderSurveyKpis();
+      applySurveyFilters();
+
+      const sampleNames = newlyAddedTargets.slice(0, 3).map(t => maskPatientName(t.patientName)).join(', ');
+      const extraTxt = newlyAddedTargets.length > 3 ? ` 외 ${newlyAddedTargets.length - 3}명` : '';
+      const successMsg = `🎉 간병종료 고객 ${newlyAddedTargets.length}명(${sampleNames}${extraTxt})이 실시간 만족도조사 대상으로 동기화되었습니다!`;
+
+      if (typeof showToast === 'function') {
+        showToast(successMsg, 'success');
+      } else {
+        alert(successMsg);
+      }
+    } else {
+      if (!isSilent) {
+        if (typeof showToast === 'function') {
+          showToast('모든 간병종료 고객이 이미 만족도조사 대상자로 등록되어 있습니다.', 'info');
+        } else {
+          alert('모든 간병종료 고객이 이미 만족도조사 대상자로 등록되어 있습니다.');
+        }
+      }
+    }
+
+    return { addedCount: newlyAddedTargets.length, totalCount: (gSurveyState.targets || []).length };
+  } catch (err) {
+    console.error('[SurveySync] Error in syncCompletedTargetsFromHub:', err);
+    if (!isSilent) {
+      if (typeof showToast === 'function') showToast('종료 고객 실시간 동기화 중 오류가 발생했습니다.', 'error');
+    }
+    return { error: err.message };
+  }
+}
+
 async function renderSurveyMgmtTab() {
   if (gIsRenderingSurveyTab) return;
   gIsRenderingSurveyTab = true;
@@ -1746,7 +1967,8 @@ async function renderSurveyMgmtTab() {
     // 1차: 기존 저장된 데이터 우선 신속 렌더링
     await loadSurveyMgmtData(false);
 
-    // 2차: 백그라운드 자동 종료 고객 추출 및 Convex 동기화
+    // 2차: 최신 간병종료 고객 실시간 추출 및 Convex 클라우드 동기화
+    await syncCompletedTargetsFromHub(true);
     await autoSeedSurveyTargets({ isSilent: true, isAuto: true });
   } catch (e) {
     console.warn('[SurveyClient] renderSurveyMgmtTab auto-sync error:', e);
@@ -6523,6 +6745,7 @@ if (typeof window !== 'undefined') {
   window.closeSurveyExcludeModal = closeSurveyExcludeModal;
   window.confirmSurveyExclude = confirmSurveyExclude;
   window.restoreExcludedSurveyTarget = restoreExcludedSurveyTarget;
+  window.syncCompletedTargetsFromHub = syncCompletedTargetsFromHub;
   window.switchBatchSmsChannel = switchBatchSmsChannel;
   window.openBatchCandidateSmsModal = openBatchCandidateSmsModal;
   window.toggleSelectAllSurveyTargets = toggleSelectAllSurveyTargets;
