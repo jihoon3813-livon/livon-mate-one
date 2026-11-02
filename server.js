@@ -2636,8 +2636,8 @@ function appendServerAuditLog(logItem) {
           const payload = JSON.parse(body || '{}');
           const { dispatchSms } = require('./sms-service');
 
-          const toPhone = (payload.phone || payload.toPhone || '').trim();
-          const customMessage = (payload.customMessage || payload.message || '').trim();
+          const toPhone = (payload.phone || payload.toPhone || payload.recipientPhone || '').trim();
+          const customMessage = (payload.customMessage || payload.customText || payload.message || '').trim();
           const subject = (payload.subject || '[리본케어] 모바일 간병일지 & 만족도 설문 안내').trim();
           const senderNumber = (payload.senderNumber || '16007835').trim();
           const provider = payload.provider || 'aligo';

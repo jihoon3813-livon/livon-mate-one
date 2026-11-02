@@ -7403,6 +7403,29 @@
       </div>
 
       <div class="p-5 overflow-y-auto space-y-4 custom-scrollbar flex-1">
+        <!-- 채널 선택 (카카오 알림톡 vs 안심문자 LMS) -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3 flex-wrap">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-black text-slate-700 flex items-center gap-1.5">
+              <i data-lucide="radio" class="w-4 h-4 text-pink-600"></i>
+              <span>발송 채널 선택:</span>
+            </span>
+            <span class="text-[11px] text-slate-500" id="batchSmsChannelNotice">알림톡 공식 템플릿 발송 (실패 시 문자 자동 대체)</span>
+          </div>
+          <div class="inline-flex p-1 bg-slate-200/80 rounded-xl gap-1" id="batchSmsChannelButtonGroup">
+            <button type="button" id="btnBatchChannelKakao" onclick="switchBatchSmsChannel('kakao')" 
+              class="px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer bg-amber-400 text-amber-950 shadow-xs">
+              <span class="w-2 h-2 rounded-full bg-amber-600"></span>
+              <span>💬 카카오 알림톡</span>
+            </button>
+            <button type="button" id="btnBatchChannelSms" onclick="switchBatchSmsChannel('sms')" 
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer text-slate-600 hover:text-slate-900">
+              <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+              <span>📱 문자 (LMS)</span>
+            </button>
+          </div>
+        </div>
+
         <!-- 요약 배너 -->
         <div class="p-3.5 rounded-2xl bg-pink-50 border border-pink-200 flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -7412,8 +7435,8 @@
               <span class="text-xs text-slate-500 font-normal">명</span>
             </div>
           </div>
-          <div class="text-xs text-slate-600 bg-white px-3 py-1.5 rounded-xl border border-pink-200">
-            🎁 혜택: <b>설문 완료 시 모바일 커피쿠폰 증정</b> 안내문자 일괄 발송
+          <div class="text-xs text-slate-600 bg-white px-3 py-1.5 rounded-xl border border-pink-200" id="batchSmsBenefitBanner">
+            🎁 혜택: <b>설문 완료 시 모바일 커피쿠폰 증정</b> 안내 일괄 발송
           </div>
         </div>
 
@@ -7460,7 +7483,7 @@
           <button type="button" onclick="closeBatchCandidateSmsModal()" id="btnCancelBatchSms" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold cursor-pointer transition-all">닫기</button>
           <button type="button" onclick="executeBatchCandidateSms()" id="btnExecuteBatchSms" class="px-5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white text-xs font-black shadow-md cursor-pointer transition-all flex items-center gap-1.5">
             <i data-lucide="send" class="w-3.5 h-3.5"></i>
-            <span>일괄 문자 발송 시작</span>
+            <span id="btnExecuteBatchSmsText">일괄 알림톡 발송 시작</span>
           </button>
         </div>
       </div>

@@ -1520,11 +1520,14 @@ async function loadSurveyMgmtData(showToastAlert = false) {
       const prev = targetMap.get(key) || {};
       const merged = { ...prev, ...item, id: key };
       // 쿠폰 수신 번호, 설문 응답(answers) 및 선물 발송 관리 정보는 비어있지 않은 최신 값을 보존
-      ['answers', 'avgRating', 'couponPhone', 'giftStatus', 'giftItem', 'giftSentAt', 'giftMethod', 'giftSender', 'giftMemo', 'giftHistory', 'respondentType', 'q2Score', 'q3Score', 'q4Score', 'surveyComment', 'submittedAt'].forEach(f => {
-        if ((merged[f] === undefined || merged[f] === '' || merged[f] === 'NONE' || (f === 'answers' && (!merged[f] || Object.keys(merged[f]).length === 0))) && prev[f] && prev[f] !== 'NONE') {
+      ['answers', 'avgRating', 'couponPhone', 'giftStatus', 'giftItem', 'giftSentAt', 'giftMethod', 'giftSender', 'giftMemo', 'giftHistory', 'respondentType', 'q2Score', 'q3Score', 'q4Score', 'surveyComment', 'submittedAt', 'smsSentHistory', 'lastSmsSentAt', 'guidanceStatus', 'guidanceRecord'].forEach(f => {
+        if ((merged[f] === undefined || merged[f] === '' || merged[f] === 'NONE' || (f === 'answers' && (!merged[f] || Object.keys(merged[f]).length === 0)) || (f === 'smsSentHistory' && (!Array.isArray(merged[f]) || merged[f].length === 0))) && prev[f] && prev[f] !== 'NONE') {
           merged[f] = prev[f];
         }
       });
+      if (prev.guidanceStatus === 'GUIDED' && merged.guidanceStatus !== 'GUIDED') {
+        merged.guidanceStatus = 'GUIDED';
+      }
       if (prev.responseStatus === 'SUBMITTED' && merged.responseStatus !== 'SUBMITTED') {
         merged.responseStatus = 'SUBMITTED';
       }
@@ -6024,7 +6027,44 @@ function restoreExcludedSurveyTarget(targetId) {
   }
 }
 
-// 5. 후보군 일괄 문자 발송 모달 및 실행 플로우
+// 5. 후보군 일괄 발송 모달 및 실행 플로우 (문자/카카오톡 선택 가능)
+let gCurrentBatchSmsChannel = 'kakao'; // 기본값: 카카오 알림톡
+
+function switchBatchSmsChannel(channelMode = 'kakao') {
+  gCurrentBatchSmsChannel = (channelMode === 'sms') ? 'sms' : 'kakao';
+
+  const btnKakao = document.getElementById('btnBatchChannelKakao');
+  const btnSms = document.getElementById('btnBatchChannelSms');
+  const noticeEl = document.getElementById('batchSmsChannelNotice');
+  const modalTitle = document.getElementById('batchSmsModalTitle');
+  const btnExecuteText = document.getElementById('btnExecuteBatchSmsText');
+  const benefitBanner = document.getElementById('batchSmsBenefitBanner');
+
+  if (gCurrentBatchSmsChannel === 'kakao') {
+    if (btnKakao) {
+      btnKakao.className = 'px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer bg-amber-400 text-amber-950 shadow-xs';
+    }
+    if (btnSms) {
+      btnSms.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer text-slate-600 hover:text-slate-900';
+    }
+    if (noticeEl) noticeEl.innerText = '알림톡 공식 템플릿 발송 (실패 시 문자 자동 대체)';
+    if (modalTitle) modalTitle.innerText = '선택 발송 후보군 일괄 카카오 알림톡 발송';
+    if (btnExecuteText) btnExecuteText.innerText = '일괄 알림톡 발송 시작';
+    if (benefitBanner) benefitBanner.innerHTML = '🎁 혜택: <b>설문 완료 시 모바일 커피쿠폰 증정</b> 알림톡 일괄 발송';
+  } else {
+    if (btnKakao) {
+      btnKakao.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer text-slate-600 hover:text-slate-900';
+    }
+    if (btnSms) {
+      btnSms.className = 'px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-xs';
+    }
+    if (noticeEl) noticeEl.innerText = '안심 단축문자(LMS) 직접 발송';
+    if (modalTitle) modalTitle.innerText = '선택 발송 후보군 일괄 안심문자(LMS) 발송';
+    if (btnExecuteText) btnExecuteText.innerText = '일괄 문자 발송 시작';
+    if (benefitBanner) benefitBanner.innerHTML = '🎁 혜택: <b>설문 완료 시 모바일 커피쿠폰 증정</b> 안내문자 일괄 발송';
+  }
+}
+
 function openBatchCandidateSmsModal() {
   const candidates = (gSurveyState.targets || []).filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED');
   if (candidates.length === 0) {
@@ -6042,8 +6082,9 @@ function openBatchCandidateSmsModal() {
   if (progressArea) progressArea.classList.add('hidden');
   if (btnExecute) {
     btnExecute.disabled = false;
-    btnExecute.innerHTML = '<i data-lucide="send" class="w-3.5 h-3.5"></i><span>일괄 문자 발송 시작</span>';
   }
+
+  switchBatchSmsChannel(gCurrentBatchSmsChannel || 'kakao');
 
   if (bodyEl) {
     bodyEl.innerHTML = candidates.map((t, idx) => {
@@ -6091,7 +6132,10 @@ async function executeBatchCandidateSms() {
     return;
   }
 
-  if (!confirm(`총 ${validTargets.length}명의 후보 고객에게 모바일 간병일지 & 만족도조사 안내 문자를 발송하시겠습니까?`)) return;
+  const channel = gCurrentBatchSmsChannel || 'kakao';
+  const channelName = channel === 'kakao' ? '카카오 알림톡' : '안심 문자(LMS)';
+
+  if (!confirm(`총 ${validTargets.length}명의 후보 고객에게 [${channelName}]로 모바일 간병일지 & 만족도조사 안내를 일괄 발송하시겠습니까?`)) return;
 
   const btnExecute = document.getElementById('btnExecuteBatchSms');
   const btnCancel = document.getElementById('btnCancelBatchSms');
@@ -6104,6 +6148,14 @@ async function executeBatchCandidateSms() {
   if (btnCancel) btnCancel.disabled = true;
   if (progressArea) progressArea.classList.remove('hidden');
 
+  const aligoCfg = getSurveyAligoConfig();
+  const provider = (channel === 'kakao') ? 'barobill' : 'aligo';
+  let senderNumber = '01026660883';
+  if (aligoCfg.sender && aligoCfg.sender.replace(/[^0-9]/g, '') !== '16007835') {
+    senderNumber = aligoCfg.sender.replace(/[^0-9]/g, '');
+  }
+
+  const isNewTab = (typeof gActiveTab !== 'undefined' && gActiveTab === 'surveymgmt_new');
   let successCount = 0;
   let failCount = 0;
 
@@ -6112,7 +6164,7 @@ async function executeBatchCandidateSms() {
     const currentIdx = i + 1;
     const pct = Math.round((currentIdx / validTargets.length) * 100);
 
-    if (progressLabel) progressLabel.innerText = `발송 진행 중... (${currentIdx} / ${validTargets.length}) : ${maskPatientName(t.patientName)} 님`;
+    if (progressLabel) progressLabel.innerText = `[${channelName}] 발송 진행 중... (${currentIdx} / ${validTargets.length}) : ${maskPatientName(t.patientName)} 님`;
     if (progressPercent) progressPercent.innerText = pct + '%';
     if (progressBar) progressBar.style.width = pct + '%';
 
@@ -6123,24 +6175,86 @@ async function executeBatchCandidateSms() {
       const pName = t.patientName || '고객';
       const defaultItem = (gSurveyState.settings && gSurveyState.settings.defaultGiftItem) || '스타벅스 아메리카노 Tall 1매';
 
+      const templateCode = (provider === 'barobill' || channel === 'kakao')
+        ? (getSurveyTargetInsuranceName(t).includes('현대') ? '리본케어 간병일지 및 만족도 설문 안내(현대해상)_2' : '리본케어 간병일지 및 만족도 설문 안내(삼성화재)_2')
+        : (aligoCfg.templateCode || (getSurveyTargetInsuranceName(t).includes('현대') ? 'UM_6527' : 'UM_6526'));
+
       const smsText = `[리본케어] ${pName} 님, ${titlePreset.title}\n\n간병 서비스 일자별 안심 일지를 확인하시고 간단한 만족도 설문에 참여해 주시면, 감사의 뜻으로 ${defaultItem} 모바일 쿠폰을 보내드립니다.\n\n▶ 안심 간병일지 열람 & 설문 참여:\n${shortUrl}\n\n문의: ${gSurveyState.settings.csPhone || '1544-7119'}`;
 
       const res = await fetch('/api/survey/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          isTest: false,
           targetId: t.id,
           recipientPhone,
+          phone: recipientPhone,
+          toPhone: recipientPhone,
           patientName: t.patientName,
+          subject: titlePreset.title,
+          customMessage: smsText,
           customText: smsText,
-          channel: 'sms'
+          surveyUrl: shortUrl,
+          channel,
+          buttonUrl: shortUrl,
+          buttonTitle: '모바일 간병일지 & 설문',
+          senderNumber,
+          provider: provider || (channel === 'kakao' ? 'barobill' : 'aligo'),
+          channelId: '@독거노인-장애인-돌봄',
+          userId: aligoCfg.userId,
+          apiKey: aligoCfg.apiKey,
+          senderKey: aligoCfg.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
+          templateCode,
+          isNewSurvey: isNewTab,
+          skipReward: isNewTab,
+          actor: 'HQ'
         })
       });
+
       const data = await res.json();
-      if (data && data.success) {
+      if (data && (data.success || data.receiptNum || data.gatewayDispatched)) {
         successCount++;
+        const nowIso = new Date().toISOString();
+        const smsRecord = (data && data.smsRecord) || {
+          id: 'SMS-' + Date.now().toString().slice(-6),
+          recipient: recipientPhone,
+          senderNumber,
+          senderType: 'HQ',
+          channel,
+          provider: data.provider || provider,
+          subject: titlePreset.title,
+          message: smsText,
+          surveyUrl: shortUrl,
+          status: 'SENT',
+          sentAt: nowIso
+        };
+
+        if (!Array.isArray(t.smsSentHistory)) t.smsSentHistory = [];
+        t.smsSentHistory.unshift(smsRecord);
+        t.lastSmsSentAt = nowIso;
         t.guidanceStatus = 'GUIDED';
+        t.guidanceRecord = {
+          method: 'LINK',
+          result: 'GUIDED',
+          reasonCode: channel === 'kakao' ? 'KAKAO_SENT' : 'SMS_SENT',
+          reasonDetail: channel === 'kakao' ? '본사 만족도조사(new) 알림톡 일괄 발송' : '본사 만족도조사(new) 안심문자(LMS) 일괄 발송',
+          occurredAt: nowIso
+        };
         t.isCandidate = false;
+
+        // 개별 Convex 실시간 동기화
+        if (typeof syncToConvex === 'function') {
+          syncToConvex('sync:updateSurveyTarget', {
+            id: t.id,
+            updates: {
+              guidanceStatus: t.guidanceStatus,
+              guidanceRecord: t.guidanceRecord,
+              lastSmsSentAt: t.lastSmsSentAt,
+              smsSentHistory: t.smsSentHistory,
+              isCandidate: false
+            }
+          }).catch(() => {});
+        }
       } else {
         failCount++;
       }
@@ -6153,6 +6267,7 @@ async function executeBatchCandidateSms() {
 
   persistSurveyTargets();
   updateSurveyChipCounts();
+  if (typeof renderSurveyKpis === 'function') renderSurveyKpis();
   applySurveyFilters();
 
   if (btnExecute) btnExecute.disabled = false;
@@ -6160,10 +6275,11 @@ async function executeBatchCandidateSms() {
 
   closeBatchCandidateSmsModal();
 
+  const resultMsg = `[${channelName}] 일괄 발송 완료: 성공 ${successCount}건 / 실패 ${failCount}건`;
   if (typeof showToast === 'function') {
-    showToast(`일괄 문자 발송 완료: 성공 ${successCount}건 / 실패 ${failCount}건`, successCount > 0 ? 'success' : 'error');
+    showToast(resultMsg, successCount > 0 ? 'success' : (failCount > 0 ? 'error' : 'info'));
   } else {
-    alert(`일괄 문자 발송이 완료되었습니다.\n성공: ${successCount}건 / 실패: ${failCount}건`);
+    alert(resultMsg);
   }
 }
 
@@ -6262,6 +6378,7 @@ if (typeof window !== 'undefined') {
   window.closeSurveyExcludeModal = closeSurveyExcludeModal;
   window.confirmSurveyExclude = confirmSurveyExclude;
   window.restoreExcludedSurveyTarget = restoreExcludedSurveyTarget;
+  window.switchBatchSmsChannel = switchBatchSmsChannel;
   window.openBatchCandidateSmsModal = openBatchCandidateSmsModal;
   window.closeBatchCandidateSmsModal = closeBatchCandidateSmsModal;
   window.executeBatchCandidateSms = executeBatchCandidateSms;
