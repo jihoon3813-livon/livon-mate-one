@@ -2,7 +2,9 @@
 // Vercel Serverless Function: Survey SMS & Alimtalk Dispatch
 
 const { dispatchSms } = require('../../sms-service');
-const { getSurveyService } = require('../../survey-service');
+const surveyModule = require('../../survey-service');
+const gSurveyService = surveyModule.gSurveyService || surveyModule;
+const getSurveyService = () => surveyModule.gSurveyService || (typeof surveyModule.getSurveyService === 'function' ? surveyModule.getSurveyService() : surveyModule);
 
 const DEV_CONVEX_URL = 'https://rapid-raccoon-895.convex.cloud';
 const PROD_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';

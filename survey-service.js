@@ -1068,6 +1068,7 @@ const gSurveyService = new SurveyService();
 
 module.exports = {
   gSurveyService,
+  getSurveyService: () => gSurveyService,
   DEFAULT_SETTINGS,
   SURVEY_SCHEMA_V1
 };

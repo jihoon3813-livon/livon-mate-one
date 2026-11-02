@@ -6575,10 +6575,14 @@ async function executeBatchCandidateSms() {
   if (progressArea) progressArea.classList.remove('hidden');
 
   const aligoCfg = getSurveyAligoConfig();
-  const provider = (channel === 'kakao') ? 'barobill' : 'aligo';
-  let senderNumber = '01026660883';
-  if (aligoCfg.sender && aligoCfg.sender.replace(/[^0-9]/g, '') !== '16007835') {
-    senderNumber = aligoCfg.sender.replace(/[^0-9]/g, '');
+  const inputProvider = document.getElementById('batchSmsProviderSelect')?.value;
+  const inputSender = (document.getElementById('batchSmsSenderNumber')?.value || '').replace(/[^0-9]/g, '');
+  const inputChannelId = (document.getElementById('batchSmsChannelId')?.value || '').trim() || '@독거노인-장애인-돌봄';
+
+  const provider = inputProvider || ((channel === 'kakao') ? 'barobill' : 'aligo');
+  let senderNumber = inputSender || (channel === 'kakao' ? '16007835' : (aligoCfg.sender ? aligoCfg.sender.replace(/[^0-9]/g, '') : '01026660883'));
+  if (provider === 'barobill') {
+    senderNumber = '16007835'; // 바로빌은 등록된 공식 대표번호 1600-7835 필수
   }
 
   const isNewTab = (typeof gActiveTab !== 'undefined' && gActiveTab === 'surveymgmt_new');
@@ -6645,10 +6649,10 @@ async function executeBatchCandidateSms() {
           surveyUrl: shortUrl,
           channel,
           buttonUrl: shortUrl,
-          buttonTitle: '모바일 간병일지 & 설문 열람하기',
+          buttonTitle: '모바일 간병일지 & 설문',
           senderNumber,
           provider: provider || (channel === 'kakao' ? 'barobill' : 'aligo'),
-          channelId: '@독거노인-장애인-돌봄',
+          channelId: inputChannelId,
           userId: aligoCfg.userId,
           apiKey: aligoCfg.apiKey,
           senderKey: aligoCfg.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
