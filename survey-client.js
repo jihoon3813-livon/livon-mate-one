@@ -2297,14 +2297,18 @@ const gSelectedSurveyTargetIds = new Set();
 function updateSelectedSurveyTargetsUI() {
   const countEl = document.getElementById('surveySelectedTargetsCount');
   const btnEl = document.getElementById('btnSendSelectedSurveyTargets');
+  const regBtnEl = document.getElementById('btnRegisterSelectedTargetsOnly');
+  const regCountEl = document.getElementById('surveySelectedAsCandidateCount');
   const count = gSelectedSurveyTargetIds.size;
   if (countEl) countEl.innerText = count;
-  if (btnEl) {
-    if (count > 0) {
-      btnEl.classList.remove('hidden');
-    } else {
-      btnEl.classList.add('hidden');
-    }
+  if (regCountEl) regCountEl.innerText = count;
+
+  if (count > 0) {
+    if (btnEl) btnEl.classList.remove('hidden');
+    if (regBtnEl) regBtnEl.classList.remove('hidden');
+  } else {
+    if (btnEl) btnEl.classList.add('hidden');
+    if (regBtnEl) regBtnEl.classList.add('hidden');
   }
 
   const masterCb = document.getElementById('checkAllSurveyTargets_new');
@@ -6278,6 +6282,49 @@ function clearAllSurveyCandidates() {
   }
 }
 
+// 3-2. 전체보기 등에서 체크박스로 선택한 고객만 후보군으로 등록 (기존 후보 비우고 선택 고객만 등록)
+function registerSelectedTargetsAsCandidatesOnly() {
+  if (gSelectedSurveyTargetIds.size === 0) {
+    if (typeof showToast === 'function') showToast('선택된 고객이 없습니다. 목록에서 체크박스를 선택해 주세요.', 'warning');
+    return;
+  }
+
+  const selectedTargets = (gSurveyState.targets || []).filter(t => gSelectedSurveyTargetIds.has(t.id));
+  const validTargets = selectedTargets.filter(t => t.excludeStatus !== 'EXCLUDED');
+
+  if (validTargets.length === 0) {
+    if (typeof showToast === 'function') showToast('선택된 고객이 모두 발송 제외 상태이거나 유효하지 않습니다.', 'warning');
+    return;
+  }
+
+  // 1. 기존 모든 후보 해제 (사용자 요청: 선택한 고객만 후보군 등록)
+  (gSurveyState.targets || []).forEach(t => {
+    t.isCandidate = false;
+  });
+
+  // 2. 선택된 대상자들만 후보로 지정
+  const nowIso = new Date().toISOString();
+  validTargets.forEach(t => {
+    t.isCandidate = true;
+    t.candidateAt = nowIso;
+  });
+
+  persistSurveyTargets();
+  updateSurveyChipCounts();
+  applySurveyFilters();
+
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    lucide.createIcons();
+  }
+
+  const msg = `선택하신 고객 ${validTargets.length}명만 🎯 발송 후보로 등록되었습니다. (기존 후보 초기화 완료)`;
+  if (typeof showToast === 'function') {
+    showToast(msg, 'success');
+  } else {
+    alert(msg);
+  }
+}
+
 // 4. 발송 제외 모달 관리 (아이디어 4)
 let gActiveExcludeTargetId = null;
 
@@ -6741,6 +6788,7 @@ if (typeof window !== 'undefined') {
   window.toggleSurveyCandidate = toggleSurveyCandidate;
   window.autoSelectSurveyCandidates = autoSelectSurveyCandidates;
   window.clearAllSurveyCandidates = clearAllSurveyCandidates;
+  window.registerSelectedTargetsAsCandidatesOnly = registerSelectedTargetsAsCandidatesOnly;
   window.openSurveyExcludeModal = openSurveyExcludeModal;
   window.closeSurveyExcludeModal = closeSurveyExcludeModal;
   window.confirmSurveyExclude = confirmSurveyExclude;
