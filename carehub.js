@@ -7128,6 +7128,322 @@ function refreshCustomerMemoSection(appId) {
 }
 window.refreshCustomerMemoSection = refreshCustomerMemoSection;
 
+
+/**
+ * [NEW] 간병일시 간편 관리 및 수정 모달 (신청정보 기준 및 배정일정 동시 관리)
+ * @param {string} appId 신청 ID
+ * @param {string|null} assignId 배정 ID (선택)
+ */
+function openCareScheduleEditModal(appId, assignId) {
+  const app = (typeof gApps !== "undefined" ? gApps : []).find(a => a && (String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, "") === String(appId).replace(/^[CH]/, "")));
+  if (!app) {
+    alert("고객 신청 정보를 찾을 수 없습니다: " + appId);
+    return;
+  }
+
+  let as = null;
+  if (assignId) {
+    as = (typeof gAssigns !== "undefined" ? gAssigns : []).find(a => a && String(a.id) === String(assignId));
+  } else {
+    const appAssigns = (typeof gAssigns !== "undefined" ? gAssigns : []).filter(a => a && a.applyId === app.id);
+    if (appAssigns.length > 0) {
+      as = appAssigns[appAssigns.length - 1];
+    }
+  }
+
+  let curStart = (as && as.startDate) || app.careStartDate || app.desiredDate || app.desiredStartDate || "";
+  let curEnd = (as && as.endDate) || app.careEndDate || app.expectedEndDate || "";
+
+  function splitDateTime(val) {
+    if (!val || val === "-" || val === "미정" || val === "진행중") return { date: "", time: "09:00" };
+    const cleaned = String(val).trim().replace(/\./g, "-");
+    const parts = cleaned.split(/\s+/);
+    let datePart = "";
+    if (parts[0] && /^\d{4}-\d{2}-\d{2}$/.test(parts[0])) {
+      datePart = parts[0];
+    } else if (parts[0] && /^\d{4}-\d{1,2}-\d{1,2}$/.test(parts[0])) {
+      const dp = parts[0].split("-");
+      datePart = `${dp[0]}-${dp[1].padStart(2, "0")}-${dp[2].padStart(2, "0")}`;
+    }
+    const timePart = (parts[1] && /^\d{2}:\d{2}/.test(parts[1])) ? parts[1].slice(0, 5) : "09:00";
+    return { date: datePart, time: timePart };
+  }
+
+  const startObj = splitDateTime(curStart);
+  const endObj = splitDateTime(curEnd);
+
+  const oldModal = document.getElementById("careScheduleEditDynamicModal");
+  if (oldModal) oldModal.remove();
+
+  const timeOptions = [];
+  for (let h = 0; h < 24; h++) {
+    const hh = String(h).padStart(2, "0");
+    timeOptions.push(`${hh}:00`);
+    timeOptions.push(`${hh}:30`);
+  }
+
+  const modalHtml = `
+    <div id="careScheduleEditDynamicModal" class="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+        <!-- 모달 헤더 -->
+        <div class="bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-700 p-4 text-white flex items-center justify-between shrink-0">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center font-bold">
+              <i data-lucide="calendar" class="w-5 h-5 text-sky-100"></i>
+            </div>
+            <div>
+              <h3 class="font-black text-base tracking-tight text-white flex items-center gap-2">
+                <span>간병일시 관리 및 수정</span>
+                ${as ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-amber-950">배정일정 연동</span>' : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-200 text-sky-950">신청정보 기준</span>'}
+              </h3>
+              <p class="text-xs text-sky-100 mt-0.5">
+                고객: <b class="text-white">${app.patientName}</b> (${app.id}) ${as ? `· 간병인: <b class="text-amber-200">${as.caregiverName}</b>` : '· 간병인 미배정'}
+              </p>
+            </div>
+          </div>
+          <button type="button" onclick="document.getElementById('careScheduleEditDynamicModal').remove()" 
+            class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- 모달 폼 -->
+        <form id="careScheduleEditForm" class="p-5 overflow-y-auto space-y-4">
+          <div class="bg-sky-50/80 border border-sky-200 rounded-2xl p-3 text-[11.5px] text-sky-900 leading-relaxed">
+            <div class="font-bold flex items-center gap-1.5 mb-1 text-sky-950">
+              <i data-lucide="info" class="w-3.5 h-3.5 text-sky-600"></i>
+              <span>간병 시작일시 및 종료예정일 안내</span>
+            </div>
+            신청 시 등록된 간병종료 예정일과 배정 일정의 종료일시를 관리합니다. 변경 시 신청서와 배정 대장에 실시간 동기화되어 진행중/완료 판정 및 잔여일수 계산에 반영됩니다.
+          </div>
+
+          <!-- 간병 시작일시 -->
+          <div class="space-y-1.5">
+            <label class="block text-xs font-black text-slate-800 flex items-center justify-between">
+              <span class="flex items-center gap-1.5">
+                <i data-lucide="play-circle" class="w-3.5 h-3.5 text-sky-600"></i>
+                간병 시작일시
+              </span>
+              ${app.desiredDate ? `<span class="text-[10.5px] font-normal text-slate-500">신청 희망일: ${app.desiredDate}</span>` : ''}
+            </label>
+            <div class="grid grid-cols-5 gap-2">
+              <input type="date" id="csEditModal_startDate" value="${startObj.date}" required
+                class="col-span-3 px-3 py-2 rounded-xl border border-slate-300 bg-white font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+              <select id="csEditModal_startTime" 
+                class="col-span-2 px-2.5 py-2 rounded-xl border border-slate-300 bg-white font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 cursor-pointer">
+                ${timeOptions.map(t => `<option value="${t}" ${t === startObj.time ? 'selected' : ''}>${t}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+
+          <!-- 간병 종료일시 -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <label class="block text-xs font-black text-slate-800 flex items-center gap-1.5">
+                <i data-lucide="flag" class="w-3.5 h-3.5 text-emerald-600"></i>
+                간병 종료일시 (또는 종료예정일)
+              </label>
+              <button type="button" id="csEditOngoingBtn"
+                class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 transition-all cursor-pointer">
+                진행중(미지정)
+              </button>
+            </div>
+            <div class="grid grid-cols-5 gap-2">
+              <input type="date" id="csEditModal_endDate" value="${endObj.date}"
+                class="col-span-3 px-3 py-2 rounded-xl border border-slate-300 bg-white font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+              <select id="csEditModal_endTime" 
+                class="col-span-2 px-2.5 py-2 rounded-xl border border-slate-300 bg-white font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 cursor-pointer">
+                ${timeOptions.map(t => `<option value="${t}" ${t === endObj.time ? 'selected' : ''}>${t}</option>`).join('')}
+              </select>
+            </div>
+
+            <!-- 빠른 기간 설정 버튼들 -->
+            <div class="flex items-center gap-1.5 pt-1 flex-wrap">
+              <span class="text-[10px] text-slate-500 font-bold">빠른 종료일:</span>
+              <button type="button" class="cs-quick-add-btn px-2 py-1 rounded-lg text-[10.5px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all cursor-pointer" data-days="7">+7일</button>
+              <button type="button" class="cs-quick-add-btn px-2 py-1 rounded-lg text-[10.5px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all cursor-pointer" data-days="14">+14일</button>
+              <button type="button" class="cs-quick-add-btn px-2 py-1 rounded-lg text-[10.5px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all cursor-pointer" data-days="30">+30일</button>
+              ${(app.careEndDate && app.careEndDate !== curEnd) ? `
+                <button type="button" id="csSyncToAppEndBtn" class="px-2 py-1 rounded-lg text-[10.5px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition-all cursor-pointer">
+                  신청서 종료일(${app.careEndDate})로 맞춤
+                </button>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- 실시간 계산 요약 박스 -->
+          <div id="csEditCalcSummary" class="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between font-mono">
+            <span class="text-slate-500 font-sans">예상 간병 기간:</span>
+            <b id="csEditDurationText" class="text-slate-900 font-black">-</b>
+          </div>
+
+          <!-- 모달 버튼 -->
+          <div class="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+            <button type="button" onclick="document.getElementById('careScheduleEditDynamicModal').remove()" 
+              class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer">
+              취소
+            </button>
+            <button type="submit" id="csEditSaveBtn"
+              class="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>일시 저장 및 반영</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML("beforeend", modalHtml);
+  if (typeof lucide !== "undefined" && lucide.createIcons) lucide.createIcons();
+
+  const startDateEl = document.getElementById("csEditModal_startDate");
+  const startTimeEl = document.getElementById("csEditModal_startTime");
+  const endDateEl = document.getElementById("csEditModal_endDate");
+  const endTimeEl = document.getElementById("csEditModal_endTime");
+  const durationTextEl = document.getElementById("csEditDurationText");
+
+  function updateDurationDisplay() {
+    const sDate = startDateEl.value;
+    const sTime = startTimeEl.value;
+    const eDate = endDateEl.value;
+    const eTime = endTimeEl.value;
+
+    if (!sDate) {
+      durationTextEl.textContent = "시작일시를 입력하세요";
+      return;
+    }
+    if (!eDate) {
+      durationTextEl.innerHTML = '<span class="text-emerald-600 font-bold">간병 진행중 (종료일 미지정)</span>';
+      return;
+    }
+
+    const sDt = new Date(`${sDate}T${sTime}:00`);
+    const eDt = new Date(`${eDate}T${eTime}:00`);
+    const diffMs = eDt - sDt;
+    if (diffMs <= 0) {
+      durationTextEl.innerHTML = '<span class="text-rose-600 font-bold">종료일시가 시작일시보다 빠릅니다</span>';
+      return;
+    }
+
+    const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+    const calcDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    durationTextEl.innerHTML = `<span class="text-sky-700 font-bold">총 ${calcDays}일 (${diffHours}시간)</span>`;
+  }
+
+  startDateEl.addEventListener("change", updateDurationDisplay);
+  startTimeEl.addEventListener("change", updateDurationDisplay);
+  endDateEl.addEventListener("change", updateDurationDisplay);
+  endTimeEl.addEventListener("change", updateDurationDisplay);
+  updateDurationDisplay();
+
+  document.querySelectorAll(".cs-quick-add-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const days = parseInt(btn.getAttribute("data-days"), 10);
+      const baseDateStr = startDateEl.value || new Date().toISOString().slice(0, 10);
+      const baseDt = new Date(baseDateStr);
+      baseDt.setDate(baseDt.getDate() + days);
+      endDateEl.value = baseDt.toISOString().slice(0, 10);
+      endTimeEl.value = startTimeEl.value || "09:00";
+      updateDurationDisplay();
+    });
+  });
+
+  const ongoingBtn = document.getElementById("csEditOngoingBtn");
+  if (ongoingBtn) {
+    ongoingBtn.addEventListener("click", () => {
+      endDateEl.value = "";
+      updateDurationDisplay();
+    });
+  }
+
+  const syncAppEndBtn = document.getElementById("csSyncToAppEndBtn");
+  if (syncAppEndBtn) {
+    syncAppEndBtn.addEventListener("click", () => {
+      const appEndObj = splitDateTime(app.careEndDate);
+      if (appEndObj.date) {
+        endDateEl.value = appEndObj.date;
+        endTimeEl.value = appEndObj.time;
+        updateDurationDisplay();
+      }
+    });
+  }
+
+  const form = document.getElementById("careScheduleEditForm");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const saveBtn = document.getElementById("csEditSaveBtn");
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> <span>저장 중...</span>';
+    }
+
+    const sDate = startDateEl.value.trim();
+    const sTime = startTimeEl.value.trim() || "09:00";
+    const eDate = endDateEl.value.trim();
+    const eTime = endTimeEl.value.trim() || "09:00";
+
+    const finalStart = sDate ? `${sDate.replace(/-/g, ".")} ${sTime}` : "";
+    const finalEnd = eDate ? `${eDate.replace(/-/g, ".")} ${eTime}` : "";
+
+    app.careStartDate = finalStart;
+    app.careEndDate = finalEnd;
+    app.updatedAt = new Date().toISOString();
+
+    if (as) {
+      as.startDate = finalStart;
+      as.endDate = finalEnd || "진행중";
+      as.updatedAt = new Date().toISOString();
+    }
+
+    try {
+      if (typeof window.syncToConvex === "function") {
+        window.syncToConvex("sync:saveApplication", { app: app }).catch(() => {});
+        if (as) {
+          window.syncToConvex("sync:saveAssignment", { assignment: as }).catch(() => {});
+        }
+      } else if (window.syncService) {
+        if (window.syncService.saveApplication) await window.syncService.saveApplication(app);
+        if (as && window.syncService.saveAssignment) await window.syncService.saveAssignment(as);
+      }
+    } catch (err) {
+      console.warn("Convex sync warning in openCareScheduleEditModal:", err);
+    }
+
+    if (typeof window.recordSystemAuditLog === "function") {
+      window.recordSystemAuditLog({
+        category: "간병일시",
+        actionType: "UPDATE",
+        target: `${app.id} (${app.patientName})`,
+        summary: `간병 시작/종료 일시 수정: ${finalStart} ~ ${finalEnd || "진행중"}`,
+        changes: {
+          "시작일시": { before: curStart, after: finalStart },
+          "종료일시": { before: curEnd, after: finalEnd || "진행중" }
+        }
+      });
+    }
+
+    const dynamicModal = document.getElementById("careScheduleEditDynamicModal");
+    if (dynamicModal) dynamicModal.remove();
+
+    if (typeof openCustomerDetailModal === "function") {
+      openCustomerDetailModal(app.id);
+    } else if (typeof renderCustomerDetailModal === "function") {
+      renderCustomerDetailModal(app.id);
+    }
+
+    if (typeof renderUnifiedCareHub === "function") renderUnifiedCareHub();
+    if (typeof renderHubStats === "function") renderHubStats();
+
+    if (typeof showCareHubToast === "function") {
+      showCareHubToast("간병 일시가 성공적으로 저장 및 반영되었습니다.", "success");
+    } else {
+      alert("간병 일시가 성공적으로 저장 및 반영되었습니다.");
+    }
+  });
+}
+window.openCareScheduleEditModal = openCareScheduleEditModal;
+
 /**
  * [NEW] 시계열 정산·청구 라이프사이클 연동 원스탑 워크스페이스 렌더러
  * 시계열 순서: 간병제공 ➡️ 보험금 청구 ➡️ 입금 확인 ➡️ 간병비 지급
@@ -7184,6 +7500,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
   const totalCareDays = schedule.totalCareDays;
   const dailyPrice = schedule.dailyClaimPrice;
   const rounds = schedule.rounds;
+
+  const appStartVal = app.careStartDate || app.desiredDate || app.desiredStartDate || '';
+  const appEndVal = app.careEndDate || app.expectedEndDate || '';
+  const appProg = (!hasAssign && appStartVal) ? getCareProgressInfo({
+    startDate: appStartVal.includes(':') ? appStartVal : (appStartVal ? appStartVal + ' 09:00' : ''),
+    endDate: appEndVal ? (appEndVal.includes(':') ? appEndVal : appEndVal + ' 09:00') : '진행중'
+  }) : null;
 
   // 3. 미해결 민원/긴급 인입 건 추출 및 현대해상 문자 수신 대기 상태 확인
   const isHdWaitingSms = (app.insuranceCompany || '').includes('현대해상') && 
@@ -7530,7 +7853,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
 
             <div class="p-3.5 sm:p-4 flex-1 flex flex-col justify-between space-y-3 bg-slate-50/50">
               ${!hasAssign ? `
-                <div class="my-auto p-6 text-center bg-white rounded-2xl border-2 border-dashed border-slate-300 space-y-2">
+                <div class="p-5 text-center bg-white rounded-2xl border-2 border-dashed border-slate-300 space-y-2">
                   <div class="w-10 h-10 mx-auto rounded-xl bg-slate-100 shadow-xs border border-slate-200 flex items-center justify-center text-slate-400">
                     <i data-lucide="user-x" class="w-5 h-5"></i>
                   </div>
@@ -7540,6 +7863,53 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                     <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
                     <span>간병인 배정하기</span>
                   </button>
+                </div>
+
+                <!-- 간병일시 관리 (신청정보 기준) -->
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
+                  <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
+                    <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                      <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
+                      <span>간병일시 관리 <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">신청정보 기준</span></span>
+                    </span>
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono font-black text-sky-700 text-xs">${appProg ? appProg.percent : 0}% 진행</span>
+                      <button type="button" onclick="openCareScheduleEditModal('${app.id}', null)" 
+                        class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer" title="신청 기준 간병 시작/종료 일시 수정">
+                        <i data-lucide="edit-2" class="w-3 h-3"></i> <span>일시 수정</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
+                    <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <div class="text-[10px] text-slate-400 mb-0.5">간병 시작일시 (신청)</div>
+                      <b class="text-slate-900">${formatWithTime(appStartVal, '09:00')}</b>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <div class="text-[10px] text-slate-400 mb-0.5">간병 종료 예정일시</div>
+                      <b class="text-slate-900">${appEndVal ? formatWithTime(appEndVal, '09:00') : '<span class="text-slate-400">미입력</span>'}</b>
+                    </div>
+                  </div>
+
+                  ${appProg ? `
+                    <div class="space-y-1.5 pt-1">
+                      <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner flex">
+                        <div class="h-full ${appProg.status === 'completed' ? 'bg-slate-400' : 'bg-gradient-to-r from-sky-500 to-emerald-500'} rounded-full transition-all duration-500" style="width: ${appProg.percent}%"></div>
+                      </div>
+                      <div class="flex justify-between items-center text-[10px] sm:text-[10.5px] text-slate-500 flex-wrap gap-1">
+                        ${(appProg.isOngoing || !appEndVal || appEndVal === '진행중') ? `
+                          <span class="whitespace-nowrap">간병시작: <b class="text-slate-800">${appStartVal ? appStartVal.slice(5) : '-'}</b></span>
+                          <span class="whitespace-nowrap">경과: <b class="text-slate-800">${appProg.elapsedDays}일 (${appProg.elapsedDays * 24}시간)</b></span>
+                          <span class="whitespace-nowrap"><b class="text-emerald-700 font-bold">간병 진행중</b></span>
+                        ` : `
+                          <span class="whitespace-nowrap">총 <b>${appProg.totalDays}</b>일 (${appProg.totalDays * 24}시간) 예정</span>
+                          <span class="whitespace-nowrap">경과: <b class="text-slate-800">${appProg.elapsedDays}일 (${appProg.elapsedDays * 24}시간)</b></span>
+                          <span class="whitespace-nowrap">잔여: <b class="${appProg.remainingDays === 0 ? 'text-slate-400' : 'text-amber-700 font-bold'}">${appProg.remainingDays}일 (${appProg.remainingDays * 24}시간)</b></span>
+                        `}
+                      </div>
+                    </div>
+                  ` : ''}
                 </div>
               ` : `
                 ${sortedAssigns.length > 1 ? `
@@ -7683,7 +8053,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                       <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
                       <span>간병일시 관리 ${sortedAssigns.length > 1 ? `(${maskName(as.caregiverName)})` : ''}</span>
                     </span>
-                    <span class="font-mono font-black text-sky-700 text-xs">${prog ? prog.percent : 0}% 진행</span>
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono font-black text-sky-700 text-xs">${prog ? prog.percent : 0}% 진행</span>
+                      <button type="button" onclick="openCareScheduleEditModal('${app.id}', '${as ? as.id : ''}')" 
+                        class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer" title="간병 시작/종료 일시 수정">
+                        <i data-lucide="edit-2" class="w-3 h-3"></i> <span>일시 수정</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
@@ -9862,27 +10238,73 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
           <!-- Card Body -->
           <div class="p-3.5 sm:p-5 flex-1 overflow-y-visible lg:overflow-y-auto custom-scrollbar space-y-3.5 text-xs bg-slate-50/50">
-            ${!hasAssign ? `
-              <!-- 간병인 미배정 시 닫혀있는 잠금/접힘 카드 이미지 UI -->
-              <div class="my-auto p-8 text-center bg-slate-100/80 rounded-2xl border-2 border-dashed border-slate-300 space-y-3">
-                <div class="w-14 h-14 mx-auto rounded-2xl bg-white shadow-xs border border-slate-200 flex items-center justify-center text-slate-400">
-                  <i data-lucide="user-x" class="w-7 h-7"></i>
+              ${!hasAssign ? `
+                <div class="p-5 text-center bg-white rounded-2xl border-2 border-dashed border-slate-300 space-y-3">
+                  <div class="w-12 h-12 mx-auto rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-inner">
+                    <i data-lucide="user-plus" class="w-6 h-6"></i>
+                  </div>
+                  <div class="space-y-1">
+                    <h5 class="font-black text-slate-700 text-sm">현재 배정된 간병인이 없습니다</h5>
+                    <p class="text-slate-500 text-[11.5px] max-w-[240px] mx-auto leading-relaxed">
+                      간병인을 매칭하고 배정 등록을 완료하면 인적사항, 음성일지, 정산 내역이 자동으로 활성화됩니다.
+                    </p>
+                  </div>
+                  <div class="pt-2">
+                    <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
+                      class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-xs shadow-md inline-flex items-center gap-1.5 transition-all">
+                      <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                      <span>간병인 즉시 배정하기</span>
+                    </button>
+                  </div>
                 </div>
-                <div class="space-y-1">
-                  <h5 class="font-black text-slate-700 text-sm">현재 배정된 간병인이 없습니다</h5>
-                  <p class="text-slate-500 text-[11.5px] max-w-[240px] mx-auto leading-relaxed">
-                    간병인을 매칭하고 배정 등록을 완료하면 인적사항, 음성일지, 정산 내역이 자동으로 활성화됩니다.
-                  </p>
+
+                <!-- 간병일시 관리 (신청정보 기준) -->
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
+                  <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
+                    <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                      <i data-lucide="calendar" class="w-3.5 h-3.6 text-sky-600"></i>
+                      <span>간병일시 관리 <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">신청정보 기준</span></span>
+                    </span>
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono font-black text-sky-700 text-xs">${appProg ? appProg.percent : 0}% 진행</span>
+                      <button type="button" onclick="openCareScheduleEditModal('${app.id}', null)" 
+                        class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer" title="신청 기준 간병 시작/종료 일시 수정">
+                        <i data-lucide="edit-2" class="w-3 h-3"></i> <span>일시 수정</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
+                    <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <div class="text-[10px] text-slate-400 mb-0.5">간병 시작일시 (신청)</div>
+                      <b class="text-slate-900">${formatWithTime(appStartVal, '09:00')}</b>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <div class="text-[10px] text-slate-400 mb-0.5">간병 종료 예정일시</div>
+                      <b class="text-slate-900">${appEndVal ? formatWithTime(appEndVal, '09:00') : '<span class="text-slate-400">미입력</span>'}</b>
+                    </div>
+                  </div>
+
+                  ${appProg ? `
+                    <div class="space-y-1.5 pt-1">
+                      <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner flex">
+                        <div class="h-full ${appProg.status === 'completed' ? 'bg-slate-400' : 'bg-gradient-to-r from-sky-500 to-emerald-500'} rounded-full transition-all duration-500" style="width: ${appProg.percent}%"></div>
+                      </div>
+                      <div class="flex justify-between items-center text-[10px] sm:text-[10.5px] text-slate-500 flex-wrap gap-1">
+                        ${(appProg.isOngoing || !appEndVal || appEndVal === '진행중') ? `
+                          <span class="whitespace-nowrap">간병시작: <b class="text-slate-800">${appStartVal ? appStartVal.slice(5) : '-'}</b></span>
+                          <span class="whitespace-nowrap">경과: <b class="text-slate-800">${appProg.elapsedDays}일 (${appProg.elapsedDays * 24}시간)</b></span>
+                          <span class="whitespace-nowrap"><b class="text-emerald-700 font-bold">간병 진행중</b></span>
+                        ` : `
+                          <span class="whitespace-nowrap">총 <b>${appProg.totalDays}</b>일 (${appProg.totalDays * 24}시간) 예정</span>
+                          <span class="whitespace-nowrap">경과: <b class="text-slate-800">${appProg.elapsedDays}일 (${appProg.elapsedDays * 24}시간)</b></span>
+                          <span class="whitespace-nowrap">잔여: <b class="${appProg.remainingDays === 0 ? 'text-slate-400' : 'text-amber-700 font-bold'}">${appProg.remainingDays}일 (${appProg.remainingDays * 24}시간)</b></span>
+                        `}
+                      </div>
+                    </div>
+                  ` : ''}
                 </div>
-                <div class="pt-2">
-                  <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
-                    class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-xs shadow-md inline-flex items-center gap-1.5 transition-all">
-                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                    <span>간병인 즉시 배정하기</span>
-                  </button>
-                </div>
-              </div>
-            ` : `
+              ` : `
               <!-- 배정 완료 시 상세 내역 활성화 -->
               
               <!-- [간병인 차수별 탭 바] 교체 등으로 간병인이 여러 명일 때 상단 탭으로 즉시 전환 -->
@@ -10029,7 +10451,13 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
                     <span>간병일시 관리 ${sortedAssigns.length > 1 ? `(${maskName(as.caregiverName)})` : ''}</span>
                   </span>
-                  <span class="font-mono font-black text-sky-700 text-xs">${prog ? prog.percent : 0}% 진행</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono font-black text-sky-700 text-xs">${prog ? prog.percent : 0}% 진행</span>
+                    <button type="button" onclick="openCareScheduleEditModal('${app.id}', '${as ? as.id : ''}')" 
+                      class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer" title="간병 시작/종료 일시 수정">
+                      <i data-lucide="edit-2" class="w-3 h-3"></i> <span>일시 수정</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">

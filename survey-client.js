@@ -3451,6 +3451,20 @@ function buildIntegratedSurveyUrl(targetId, extraParams = {}) {
   return `/survey-care-diary.html?${q.toString()}`;
 }
 
+function getEffectiveSurveyTitle() {
+  const titleMap = {
+    '1': '리본케어 안심 케어 리포트 & 동행 만족도 설문',
+    '2': '리본케어 돌봄 저널 : 회복의 기록과 소중한 목소리',
+    '3': '리본케어 하루 안심 리포트 & 케어 경험 나눔',
+    '4': '리본케어 스마트 간병일지 & 케어 만족도 조사'
+  };
+  const key = String((typeof gSurveyNewTitleTheme !== 'undefined' && gSurveyNewTitleTheme) || '1');
+  return {
+    key,
+    title: titleMap[key] || titleMap['1']
+  };
+}
+
 function switchSurveyNewTitleTheme(themeKey) {
   gSurveyNewTitleTheme = String(themeKey || '1');
   try {
@@ -6432,6 +6446,8 @@ function switchBatchSmsChannel(channelMode = 'kakao') {
   const modalTitle = document.getElementById('batchSmsModalTitle');
   const btnExecuteText = document.getElementById('btnExecuteBatchSmsText');
   const benefitBanner = document.getElementById('batchSmsBenefitBanner');
+  const providerSel = document.getElementById('batchSmsProviderSelect');
+  const senderInp = document.getElementById('batchSmsSenderNumber');
 
   if (gCurrentBatchSmsChannel === 'kakao') {
     if (btnKakao) {
@@ -6444,6 +6460,8 @@ function switchBatchSmsChannel(channelMode = 'kakao') {
     if (modalTitle) modalTitle.innerText = '선택 발송 후보군 일괄 카카오 알림톡 발송';
     if (btnExecuteText) btnExecuteText.innerText = '일괄 알림톡 발송 시작';
     if (benefitBanner) benefitBanner.innerHTML = '🎁 혜택: <b>설문 완료 시 모바일 커피쿠폰 증정</b> 알림톡 일괄 발송';
+    if (providerSel) providerSel.value = 'barobill';
+    if (senderInp) senderInp.value = '1600-7835';
   } else {
     if (btnKakao) {
       btnKakao.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer text-slate-600 hover:text-slate-900';
@@ -6455,6 +6473,9 @@ function switchBatchSmsChannel(channelMode = 'kakao') {
     if (modalTitle) modalTitle.innerText = '선택 발송 후보군 일괄 안심문자(LMS) 발송';
     if (btnExecuteText) btnExecuteText.innerText = '일괄 문자 발송 시작';
     if (benefitBanner) benefitBanner.innerHTML = '🎁 혜택: <b>설문 완료 시 모바일 커피쿠폰 증정</b> 안내문자 일괄 발송';
+    if (providerSel) providerSel.value = 'aligo';
+    const aligoCfg = getSurveyAligoConfig();
+    if (senderInp) senderInp.value = formatCouponPhoneDisplay(aligoCfg.sender || '01026660883') || '010-2666-0883';
   }
 }
 
@@ -6601,11 +6622,14 @@ async function executeBatchCandidateSms() {
     try {
       const recipientPhone = (t.couponPhone || t.patientPhone || '').replace(/[^0-9]/g, '');
       const shortUrl = getSurveyTargetUrlForSms(t);
-      const titlePreset = getEffectiveSurveyTitle();
+      const titlePreset = typeof getEffectiveSurveyTitle === 'function'
+        ? getEffectiveSurveyTitle()
+        : { title: '리본케어 안심 케어 리포트 & 동행 만족도 설문' };
       const pName = t.patientName || '고객';
       const defaultItem = (gSurveyState.settings && gSurveyState.settings.defaultGiftItem) || '스타벅스 아메리카노 Tall 1매';
 
-      const isHyundai = getSurveyTargetInsuranceName(t).includes('현대');
+      const insName = getSurveyTargetInsuranceName(t);
+      const isHyundai = insName.includes('현대');
       const hospName = cleanSurveyHospitalName(t.hospitalName, t) || '의료기관';
       const cgName = t.caregiverName || '담당';
       const cleanGift = '스타벅스 아메리카노 Tall 1매';
@@ -6614,7 +6638,7 @@ async function executeBatchCandidateSms() {
       let messageToSend = '';
       let effectiveSubject = '';
       if (channel === 'kakao') {
-        effectiveSubject = `[리본케어] ${pName} 님의 모바일 간병일지`;
+        effectiveSubject = `[리본케어] ${pName} 님 모바일 안심 간병일지 & 만족도 설문 안내`;
         messageToSend =
           `[리본케어] ${pName} 님의 모바일 안심 간병일지 & 케어 만족도 설문이 도착했습니다.\n\n` +
           `• 병원/간병인: ${hospName} (${cgName} 간병사)\n\n` +
@@ -6624,7 +6648,7 @@ async function executeBatchCandidateSms() {
           `※ 문의: 리본케어 고객센터 (${csContact})`;
       } else {
         effectiveSubject = titlePreset.title;
-        messageToSend = `[리본케어] ${pName} 님, ${titlePreset.title}\n\n간병 서비스 일자별 안심 일지를 확인하시고 간단한 만족도 설문에 참여해 주시면, 감사의 뜻으로 ${defaultItem} 모바일 쿠폰을 보내드립니다.\n\n▶ 안심 간병일지 열람 & 설문 참여:\n${shortUrl}\n\n문의: ${gSurveyState.settings.csPhone || '1544-7119'}`;
+        messageToSend = `[리본케어] ${pName} 님, ${titlePreset.title}\n\n간병 서비스 일자별 안심 일지를 확인하시고 간단한 만족도 설문에 참여해 주시면, 감사의 뜻으로 ${defaultItem} 모바일 쿠폰을 보내드립니다.\n\n▶ 안심 간병일지 열람 & 설문 참여:\n${shortUrl}\n\n문의: ${(gSurveyState.settings && gSurveyState.settings.csPhone) || '1544-7119'}`;
       }
 
       const templateCode = (provider === 'barobill' || channel === 'kakao')
@@ -6637,6 +6661,16 @@ async function executeBatchCandidateSms() {
         body: JSON.stringify({
           isTest: false,
           targetId: t.id,
+          targetInfo: {
+            id: t.id,
+            serviceId: t.serviceId || t.id,
+            patientName: t.patientName,
+            hospitalName: hospName,
+            caregiverName: cgName,
+            token: t.token || (t.id ? String(t.id).replace(/^ST-/, '') : ''),
+            patientPhone: recipientPhone,
+            insuranceCompany: insName
+          },
           recipientPhone,
           phone: recipientPhone,
           toPhone: recipientPhone,

@@ -33092,6 +33092,18 @@ function openNewAssignModal(targetApplyId = null, isReplacement = false) {
   let defaultStartDate = todayStr.replace(/-/g, '.') + ' 09:00';
   let defaultEndDate = todayStr.replace(/-/g, '.') + ' 09:00';
 
+  const targetApp = targetApplyId ? (gApps || []).find(a => a && (String(a.id) === String(targetApplyId) || String(a.id).replace(/^[CH]/, '') === String(targetApplyId).replace(/^[CH]/, ''))) : null;
+  if (targetApp) {
+    const appStart = targetApp.careStartDate || targetApp.desiredDate || targetApp.desiredStartDate;
+    if (appStart && appStart !== '-' && appStart !== '미정') {
+      defaultStartDate = (typeof formatWithTime === 'function') ? formatWithTime(appStart, '09:00') : (appStart.includes(':') ? appStart : appStart.replace(/-/g, '.') + ' 09:00');
+    }
+    const appEnd = targetApp.careEndDate || targetApp.expectedEndDate;
+    if (appEnd && appEnd !== '-' && appEnd !== '미정' && appEnd !== '진행중') {
+      defaultEndDate = (typeof formatWithTime === 'function') ? formatWithTime(appEnd, '09:00') : (appEnd.includes(':') ? appEnd : appEnd.replace(/-/g, '.') + ' 09:00');
+    }
+  }
+
   if (isReplacement && prevAssign && prevAssign.endDate) {
     // If previous caregiver has an endDate, 후임 간병인 starts around now or prevAssign endDate
     defaultStartDate = todayStr.replace(/-/g, '.') + ' 09:00';
