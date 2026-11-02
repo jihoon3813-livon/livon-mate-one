@@ -6282,8 +6282,8 @@ function clearAllSurveyCandidates() {
   }
 }
 
-// 3-2. 전체보기 등에서 체크박스로 선택한 고객만 후보군으로 등록 (기존 후보 비우고 선택 고객만 등록)
-function registerSelectedTargetsAsCandidatesOnly() {
+// 3-2. 전체보기 등에서 체크박스로 선택한 고객들을 발송 후보로 추가 등록 (기존 후보 유지 + 선택 고객 누적 추가)
+function registerSelectedTargetsAsCandidatesOnly(resetExisting = false) {
   if (gSelectedSurveyTargetIds.size === 0) {
     if (typeof showToast === 'function') showToast('선택된 고객이 없습니다. 목록에서 체크박스를 선택해 주세요.', 'warning');
     return;
@@ -6297,17 +6297,26 @@ function registerSelectedTargetsAsCandidatesOnly() {
     return;
   }
 
-  // 1. 기존 모든 후보 해제 (사용자 요청: 선택한 고객만 후보군 등록)
-  (gSurveyState.targets || []).forEach(t => {
-    t.isCandidate = false;
-  });
+  // resetExisting이 true인 경우에만 기존 후보 초기화, 기본값은 false(누적 추가)
+  if (resetExisting) {
+    (gSurveyState.targets || []).forEach(t => {
+      t.isCandidate = false;
+    });
+  }
 
-  // 2. 선택된 대상자들만 후보로 지정
+  let newlyAddedCount = 0;
   const nowIso = new Date().toISOString();
   validTargets.forEach(t => {
-    t.isCandidate = true;
-    t.candidateAt = nowIso;
+    if (!t.isCandidate) {
+      t.isCandidate = true;
+      t.candidateAt = nowIso;
+      newlyAddedCount++;
+    }
   });
+
+  // 후보 등록 완료 후 선택 체크박스 초기화
+  gSelectedSurveyTargetIds.clear();
+  updateSelectedSurveyTargetsUI();
 
   persistSurveyTargets();
   updateSurveyChipCounts();
@@ -6317,7 +6326,14 @@ function registerSelectedTargetsAsCandidatesOnly() {
     lucide.createIcons();
   }
 
-  const msg = `선택하신 고객 ${validTargets.length}명만 🎯 발송 후보로 등록되었습니다. (기존 후보 초기화 완료)`;
+  const totalCandidateCount = (gSurveyState.targets || []).filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED').length;
+  let msg = '';
+  if (newlyAddedCount > 0) {
+    msg = `선택하신 고객 ${newlyAddedCount}명이 🎯 발송 후보로 추가되었습니다. (현재 총 후보: ${totalCandidateCount}명)`;
+  } else {
+    msg = `선택하신 고객은 이미 발송 후보에 모두 포함되어 있습니다. (현재 총 후보: ${totalCandidateCount}명)`;
+  }
+
   if (typeof showToast === 'function') {
     showToast(msg, 'success');
   } else {
@@ -6789,6 +6805,7 @@ if (typeof window !== 'undefined') {
   window.autoSelectSurveyCandidates = autoSelectSurveyCandidates;
   window.clearAllSurveyCandidates = clearAllSurveyCandidates;
   window.registerSelectedTargetsAsCandidatesOnly = registerSelectedTargetsAsCandidatesOnly;
+  window.registerSelectedTargetsAsCandidates = registerSelectedTargetsAsCandidatesOnly;
   window.openSurveyExcludeModal = openSurveyExcludeModal;
   window.closeSurveyExcludeModal = closeSurveyExcludeModal;
   window.confirmSurveyExclude = confirmSurveyExclude;
