@@ -2728,6 +2728,7 @@ function appendServerAuditLog(logItem) {
                 buttonTitle,
                 subject,
                 category: payload.isNewSurvey ? 'SURVEY_NEW_SMS' : 'SURVEY_SMS',
+                testMode: 'PRODUCTION',
                 apiKey,
                 userId,
                 senderKey,
@@ -2741,6 +2742,9 @@ function appendServerAuditLog(logItem) {
 
           const result = gSurveyService.sendSurveySms(payload.targetId, {
             phone: toPhone,
+            patientName: payload.patientName || '',
+            hospitalName: payload.hospitalName || '',
+            caregiverName: payload.caregiverName || '',
             customMessage: customMessage || undefined,
             subject,
             surveyUrl: payload.surveyUrl || undefined,

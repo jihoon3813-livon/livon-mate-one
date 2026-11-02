@@ -535,8 +535,23 @@ class SurveyService {
 
   // 본사 메이트원 또는 리본메이트 간병인 앱 만족도 조사 안내 문자(SMS) 발송
   sendSurveySms(targetId, options = {}, actor = 'HQ') {
-    const target = this.data.targets.find(t => t.id === targetId || t.serviceId === targetId);
-    if (!target) return { success: false, message: '설문 대상을 찾을 수 없습니다.' };
+    let target = this.data.targets.find(t => t.id === targetId || t.serviceId === targetId);
+    if (!target) {
+      // 서버 메모리에 아직 없는 신규 동기화 대상자인 경우 가상 타겟 자동 보강하여 발송 차단 방어
+      target = {
+        id: targetId,
+        serviceId: String(targetId).replace(/^ST-/, ''),
+        patientName: options.patientName || '고객',
+        patientPhone: options.phone || '',
+        couponPhone: options.phone || '',
+        hospitalName: options.hospitalName || '',
+        caregiverName: options.caregiverName || '',
+        guidanceStatus: 'NOT_STARTED',
+        responseStatus: 'NOT_STARTED',
+        smsSentHistory: []
+      };
+      this.data.targets.push(target);
+    }
 
     const recipientPhone = options.phone || target.couponPhone || target.patientPhone;
     if (!recipientPhone) {

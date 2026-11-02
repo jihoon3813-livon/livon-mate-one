@@ -3839,7 +3839,7 @@ function getSurveyTargetUrlForSms(target) {
   // 2) 바로빌 승인 템플릿의 버튼 규격이 'http://#{url}' 이므로 알림톡 모드 시 프로토콜 일치 필수
   if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
     origin = 'http://admin.livon.care';
-  } else if (gCurrentSurveySmsChannelMode === 'kakao' && origin.startsWith('https://')) {
+  } else if ((gCurrentSurveySmsChannelMode === 'kakao' || (typeof gCurrentBatchSmsChannel !== 'undefined' && gCurrentBatchSmsChannel === 'kakao')) && origin.startsWith('https://')) {
     origin = origin.replace(/^https:\/\//, 'http://');
   }
   const shortCode = getSurveyTargetShortCode(target);
@@ -6601,11 +6601,31 @@ async function executeBatchCandidateSms() {
       const pName = t.patientName || '고객';
       const defaultItem = (gSurveyState.settings && gSurveyState.settings.defaultGiftItem) || '스타벅스 아메리카노 Tall 1매';
 
-      const templateCode = (provider === 'barobill' || channel === 'kakao')
-        ? (getSurveyTargetInsuranceName(t).includes('현대') ? '리본케어 간병일지 및 만족도 설문 안내(현대해상)_2' : '리본케어 간병일지 및 만족도 설문 안내(삼성화재)_2')
-        : (aligoCfg.templateCode || (getSurveyTargetInsuranceName(t).includes('현대') ? 'UM_6527' : 'UM_6526'));
+      const isHyundai = getSurveyTargetInsuranceName(t).includes('현대');
+      const hospName = cleanSurveyHospitalName(t.hospitalName, t) || '의료기관';
+      const cgName = t.caregiverName || '담당';
+      const cleanGift = '스타벅스 아메리카노 Tall 1매';
+      const csContact = isHyundai ? '1533-7436' : '1877-7412';
 
-      const smsText = `[리본케어] ${pName} 님, ${titlePreset.title}\n\n간병 서비스 일자별 안심 일지를 확인하시고 간단한 만족도 설문에 참여해 주시면, 감사의 뜻으로 ${defaultItem} 모바일 쿠폰을 보내드립니다.\n\n▶ 안심 간병일지 열람 & 설문 참여:\n${shortUrl}\n\n문의: ${gSurveyState.settings.csPhone || '1544-7119'}`;
+      let messageToSend = '';
+      let effectiveSubject = '';
+      if (channel === 'kakao') {
+        effectiveSubject = `[리본케어] ${pName} 님의 모바일 간병일지`;
+        messageToSend =
+          `[리본케어] ${pName} 님의 모바일 안심 간병일지 & 케어 만족도 설문이 도착했습니다.\n\n` +
+          `• 병원/간병인: ${hospName} (${cgName} 간병사)\n\n` +
+          `• 참여 혜택: 설문 완료 시 환자·보호자님께 ${cleanGift} 100% 증정\n\n` +
+          `일자별 상세 간병일지를 확인하시고 하단 1분 만족도 조사에 소중한 의견을 들려주세요.\n\n` +
+          `아래 [모바일 간병일지 & 설문 열람하기] 버튼을 눌러 바로 확인해 주세요.\n\n` +
+          `※ 문의: 리본케어 고객센터 (${csContact})`;
+      } else {
+        effectiveSubject = titlePreset.title;
+        messageToSend = `[리본케어] ${pName} 님, ${titlePreset.title}\n\n간병 서비스 일자별 안심 일지를 확인하시고 간단한 만족도 설문에 참여해 주시면, 감사의 뜻으로 ${defaultItem} 모바일 쿠폰을 보내드립니다.\n\n▶ 안심 간병일지 열람 & 설문 참여:\n${shortUrl}\n\n문의: ${gSurveyState.settings.csPhone || '1544-7119'}`;
+      }
+
+      const templateCode = (provider === 'barobill' || channel === 'kakao')
+        ? (isHyundai ? '리본케어 간병일지 및 만족도 설문 안내(현대해상)_2' : '리본케어 간병일지 및 만족도 설문 안내(삼성화재)_2')
+        : (aligoCfg.templateCode || (isHyundai ? 'UM_6527' : 'UM_6526'));
 
       const res = await fetch('/api/survey/send-sms', {
         method: 'POST',
@@ -6617,13 +6637,15 @@ async function executeBatchCandidateSms() {
           phone: recipientPhone,
           toPhone: recipientPhone,
           patientName: t.patientName,
-          subject: titlePreset.title,
-          customMessage: smsText,
-          customText: smsText,
+          hospitalName: hospName,
+          caregiverName: cgName,
+          subject: effectiveSubject,
+          customMessage: messageToSend,
+          customText: messageToSend,
           surveyUrl: shortUrl,
           channel,
           buttonUrl: shortUrl,
-          buttonTitle: '모바일 간병일지 & 설문',
+          buttonTitle: '모바일 간병일지 & 설문 열람하기',
           senderNumber,
           provider: provider || (channel === 'kakao' ? 'barobill' : 'aligo'),
           channelId: '@독거노인-장애인-돌봄',
@@ -6648,8 +6670,8 @@ async function executeBatchCandidateSms() {
           senderType: 'HQ',
           channel,
           provider: data.provider || provider,
-          subject: titlePreset.title,
-          message: smsText,
+          subject: effectiveSubject,
+          message: messageToSend,
           surveyUrl: shortUrl,
           status: 'SENT',
           sentAt: nowIso
@@ -6683,9 +6705,12 @@ async function executeBatchCandidateSms() {
         }
       } else {
         failCount++;
+        const errMsg = (data && (data.message || data.error || data.gatewayWarning)) || '전송 거절';
+        console.warn(`[Batch SMS Fail] ${t.id} (${t.patientName}):`, errMsg);
       }
     } catch (e) {
       failCount++;
+      console.warn(`[Batch SMS Exception] ${t.id}:`, e.message);
     }
 
     await new Promise(r => setTimeout(r, 150));
