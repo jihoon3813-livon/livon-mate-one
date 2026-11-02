@@ -5615,6 +5615,14 @@ function reconcileAppsWithActiveAssignments(targetApps = null, targetAssigns = n
         if (!isAppEndFuture || !isTargetPastOrInverted) {
           app.careEndDate = targetEndDate;
           updatedAny = true;
+        } else if (isAppEndFuture && isTargetPastOrInverted) {
+          // ⚡ 배정 대장 종료일이 당일/과거로 축소되어 있고 신청서가 미래 종료일인 경우 -> 배정 종료일을 신청서 종료일로 보정
+          const formattedAppEnd = app.careEndDate.includes(':') ? app.careEndDate : app.careEndDate.replace(/-/g, '.') + ' 09:00';
+          activeAssign.endDate = formattedAppEnd;
+          activeAssign.updatedAt = new Date().toISOString();
+          if (typeof syncToConvex === 'function') {
+            syncToConvex('sync:saveAssignment', { assignment: activeAssign }).catch(() => {});
+          }
         }
       }
     }
@@ -7484,6 +7492,25 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
     if (!as) {
       as = (typeof getActiveCaregiverAssignment === 'function' ? getActiveCaregiverAssignment(app, sortedAssigns) : null) || sortedAssigns[sortedAssigns.length - 1];
       gActiveCaregiverTabAssignId = as ? as.id : null;
+    }
+  }
+
+  // ⚡ [신청정보 기준 간병종료 예정일 우선 동기화]:
+  // 신청서의 careEndDate가 존재하고, 최신 배정의 as.endDate가 신청서 종료일보다 과거이거나 당일로 짧게 잡혀있다면
+  // 최신 배정의 endDate를 신청서의 간병종료 예정일로 자동 동기화
+  if (hasAssign && as && app.careEndDate) {
+    const isLatestAssign = sortedAssigns.length <= 1 || (sortedAssigns[sortedAssigns.length - 1] && sortedAssigns[sortedAssigns.length - 1].id === as.id);
+    if (isLatestAssign) {
+      const pAppEnd = (typeof parseCareDateTime === 'function') ? parseCareDateTime(app.careEndDate) : null;
+      const pAsEnd = as.endDate ? ((typeof parseCareDateTime === 'function') ? parseCareDateTime(as.endDate) : null) : null;
+      if (pAppEnd && (!pAsEnd || pAppEnd > pAsEnd)) {
+        const formattedAppEnd = app.careEndDate.includes(':') ? app.careEndDate : app.careEndDate.replace(/-/g, '.') + ' 09:00';
+        as.endDate = formattedAppEnd;
+        as.updatedAt = new Date().toISOString();
+        if (typeof syncToConvex === 'function') {
+          syncToConvex('sync:saveAssignment', { assignment: as }).catch(() => {});
+        }
+      }
     }
   }
 

@@ -33983,6 +33983,24 @@ async function handleCustomerEditSubmit(e) {
     app.expectedDays = (document.getElementById('custEditExpectedDays')?.value || '').trim() || '30일';
     app.careEndDate = (document.getElementById('custEditEndDate')?.value || '').trim();
 
+    // ⚡ 간병종료 예정일 수정 시 배정 대장(assignments)의 최신 배정 종료일시도 자동 동기화
+    if (app.careEndDate) {
+      const appAssigns = (gAssigns || []).filter(a => a && (String(a.applyId) === String(app.id) || String(a.applyId).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, '')));
+      if (appAssigns.length > 0) {
+        const latestAssign = appAssigns[appAssigns.length - 1];
+        if (latestAssign) {
+          const formattedEnd = app.careEndDate.includes(':') 
+            ? app.careEndDate 
+            : (app.careEndDate.replace(/-/g, '.') + ' 09:00');
+          latestAssign.endDate = formattedEnd;
+          latestAssign.updatedAt = new Date().toISOString();
+          if (typeof syncToConvex === 'function') {
+            syncToConvex('sync:saveAssignment', { assignment: latestAssign }).catch(console.warn);
+          }
+        }
+      }
+    }
+
     // 7. 메모 및 특이사항
     const newMemo = (document.getElementById('custEditMemo')?.value || '').trim();
     app.memo = newMemo;
@@ -34153,68 +34171,11 @@ async function handleCustomerEditSubmit(e) {
       console.warn('[handleCustomerEditSubmit] localStorage error:', err);
     }
 
-    // ⚡ 2. 서버 및 디스크에 영구 저장
-    updateGlobalProgress({ percent: 55, statusText: '서버에 고객 정보를 저장하고 있습니다...' });
-    try {
-      await fetch('/api/hub/customer/update-fields', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          appId: app.id,
-          fields: app
-        })
-      });
-    } catch (netErr) {
-      console.warn('[handleCustomerEditSubmit] update-fields fetch warn:', netErr);
-    }
-
-    try {
-      await fetch('/api/hub/real-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          applications: gApps,
-          assignments: (typeof gAssigns !== 'undefined' ? gAssigns : []),
-          claims: (typeof gClaims !== 'undefined' ? gClaims : []),
-          payouts: (typeof gPayouts !== 'undefined' ? gPayouts : [])
-        })
-      });
-    } catch (netErr) {
-      console.warn('[handleCustomerEditSubmit] real-data fetch warn:', netErr);
-    }
-
-    // ⚡ 3. 상세 모달 백엔드 즉시 영구 저장 연동
-    updateGlobalProgress({ percent: 75, statusText: '통합허브 정보를 동기화하고 있습니다...' });
-    if (typeof saveActiveHubCustomerDetail === 'function') {
-      try {
-        await saveActiveHubCustomerDetail(true, app.id);
-      } catch (hubErr) {
-        console.warn('[handleCustomerEditSubmit] saveActiveHubCustomerDetail warn:', hubErr);
-      }
-    }
-
-    // ⚡ 4. Convex Cloud DB 실시간 동기화
-    updateGlobalProgress({ percent: 90, statusText: '저장 결과를 화면에 반영하고 있습니다...' });
-    if (typeof syncToConvex === 'function') {
-      syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
-    }
-
-    // ⚡ 5. 삼성화재 대상자 시트 및 관리대장 즉시 동기화
-    if ((app.insuranceCompany || '').includes('삼성')) {
-      if (typeof syncSamsungTargetSheetWithHubApps === 'function') {
-        syncSamsungTargetSheetWithHubApps(true);
-      }
-      if (typeof syncSamsungSpreadsheetData === 'function') {
-        syncSamsungSpreadsheetData(true);
-      }
-    }
-
-    // ⚡ 6. 모달 닫기 & 화면 갱신
+    // ⚡ 2. 모달 즉시 닫기 & 열린 상세 모달 우선 갱신 (사용자 체감 대기시간 0초화)
     closeModal('customerEditModal');
+    hideGlobalProgress(0, 'customerEditSave');
+
     if (typeof refreshCustomerMemoSection === 'function') refreshCustomerMemoSection(app.id);
-    if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
-    if (typeof renderApplications === 'function') renderApplications();
-    if (typeof renderDashboard === 'function') renderDashboard();
 
     // 열려있는 고객상세 팝업이 있다면 즉시 최신 정보로 리렌더링
     const hubModal = document.getElementById('hubCustomerDetailModal');
@@ -34226,19 +34187,54 @@ async function handleCustomerEditSubmit(e) {
       showNotification({
         type: 'success',
         title: '서버 및 DB 영구 저장 완료 💾',
-        message: "[" + app.id + " - " + app.patientName + "] 고객님의 신청/접수 정보가 서버에 즉시 영구 저장되었습니다.",
+        message: "[" + app.id + " - " + app.patientName + "] 고객님의 신청/접수 정보가 즉시 반영 및 저장되었습니다.",
         icon: 'check-circle'
       });
     } else {
       alert("[" + app.id + " - " + app.patientName + "] 고객님의 신청/접수 정보가 성공적으로 저장되었습니다.");
     }
 
+    // ⚡ 3. 서버(update-fields) 및 Convex Cloud DB 병렬 비동기 영구 저장 (중복 2MB 전체 덤프 제거)
+    const appSnapshot = { ...app };
+    fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: appSnapshot.id,
+        fields: appSnapshot
+      })
+    }).catch(netErr => {
+      console.warn('[handleCustomerEditSubmit] update-fields fetch warn:', netErr);
+    });
+
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveApplication', { app: appSnapshot }).catch(console.warn);
+    }
+
+    // ⚡ 4. 백그라운드 테이블/대시보드 렌더링 및 삼성화재 시트 동기화 (메인 스레드 블로킹 방지)
+    setTimeout(() => {
+      try {
+        if ((appSnapshot.insuranceCompany || '').includes('삼성')) {
+          if (typeof syncSamsungTargetSheetWithHubApps === 'function') {
+            syncSamsungTargetSheetWithHubApps(true);
+          }
+          if (typeof syncSamsungSpreadsheetData === 'function') {
+            syncSamsungSpreadsheetData(true);
+          }
+        }
+        if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+        if (typeof renderApplications === 'function') renderApplications();
+        if (typeof renderDashboard === 'function') renderDashboard();
+      } catch (bgErr) {
+        console.warn('[handleCustomerEditSubmit] background render warn:', bgErr);
+      }
+    }, 10);
+
   } catch (err) {
     console.error('[handleCustomerEditSubmit] error:', err);
     alert("저장 중 오류가 발생했습니다: " + (err.message || err));
   } finally {
-    updateGlobalProgress({ percent: 100, statusText: '고객 정보 저장이 완료되었습니다.' });
-    hideGlobalProgress(350, 'customerEditSave');
+    hideGlobalProgress(0, 'customerEditSave');
     if (submitBtn) {
       submitBtn.innerText = originalBtnText;
       submitBtn.disabled = false;
@@ -34890,59 +34886,7 @@ async function handleAppAdjusterEditSubmit(e) {
     }
   }
 
-  // 서버 저장 (update-fields & real-data 즉시 await 동기화)
-  try {
-    await fetch('/api/hub/customer/update-fields', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        appId: app.id,
-        fields: {
-          adjusterHistory: app.adjusterHistory,
-          adjusterName: app.adjusterName,
-          adjusterFirm: app.adjusterFirm,
-          adjusterPhone: app.adjusterPhone,
-          adjusterMobile: app.adjusterMobile,
-          adjusterFax: app.adjusterFax,
-          insuranceCompany: app.insuranceCompany,
-          policyNumber: app.policyNumber,
-          accidentNumber: app.accidentNumber,
-          productName: app.productName,
-          productCode: app.productCode,
-          contractPeriod: app.contractPeriod,
-          hasManualUpdate: true
-        }
-      })
-    });
-  } catch (err) {
-    console.warn('Update adjuster server error:', err);
-  }
-
-  try {
-    await fetch('/api/hub/real-data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        applications: gApps,
-        assignments: (typeof gAssigns !== 'undefined' ? gAssigns : []),
-        claims: (typeof gClaims !== 'undefined' ? gClaims : []),
-        payouts: (typeof gPayouts !== 'undefined' ? gPayouts : [])
-      })
-    });
-  } catch (err) {
-    console.warn('Update adjuster real-data error:', err);
-  }
-
-  if (typeof saveActiveHubCustomerDetail === 'function') {
-    try {
-      await saveActiveHubCustomerDetail(true, app.id);
-    } catch (err) {}
-  }
-
   closeModal('appAdjusterEditModal');
-  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
-  if (typeof renderApplications === 'function') renderApplications();
-  if (typeof renderClaims === 'function') renderClaims();
 
   // 열려있는 고객상세 팝업이 있다면 즉시 갱신
   const hubModal = document.getElementById('hubCustomerDetailModal');
@@ -34950,10 +34894,41 @@ async function handleAppAdjusterEditSubmit(e) {
     openHubCustomerDetailModal(gActiveHubModalAppId || app.id);
   }
 
-  // Convex Cloud 실시간 동기화
+  // 서버 저장 및 Convex Cloud 병렬 비동기 동기화 (중복 2MB 덤프 제거)
+  fetch('/api/hub/customer/update-fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appId: app.id,
+      fields: {
+        adjusterHistory: app.adjusterHistory,
+        adjusterName: app.adjusterName,
+        adjusterFirm: app.adjusterFirm,
+        adjusterPhone: app.adjusterPhone,
+        adjusterMobile: app.adjusterMobile,
+        adjusterFax: app.adjusterFax,
+        insuranceCompany: app.insuranceCompany,
+        policyNumber: app.policyNumber,
+        accidentNumber: app.accidentNumber,
+        productName: app.productName,
+        productCode: app.productCode,
+        contractPeriod: app.contractPeriod,
+        hasManualUpdate: true
+      }
+    })
+  }).catch(err => {
+    console.warn('Update adjuster server error:', err);
+  });
+
   if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:saveApplication', { app: app });
+    syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
   }
+
+  setTimeout(() => {
+    if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+    if (typeof renderApplications === 'function') renderApplications();
+    if (typeof renderClaims === 'function') renderClaims();
+  }, 10);
 
   // 삼성화재 명단 동기화
   if ((app.insuranceCompany || '').includes('삼성') && typeof syncSamsungSpreadsheetData === 'function') {
