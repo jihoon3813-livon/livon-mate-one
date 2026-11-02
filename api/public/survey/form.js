@@ -106,7 +106,25 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 3. 쿼리 파라미터로 환자명이 전달된 경우 Fallback 구성
+    // 3. 토큰으로 대상을 못 찾았더라도 환자명(p)이 있는 경우 Convex DB 목록에서 매칭 시도
+    if (!target && fallbackPatient) {
+      const cvxUrl = resolveConvexUrl(req);
+      try {
+        const list = await queryConvex(cvxUrl, 'sync:getSurveyTargets', {});
+        if (Array.isArray(list) && list.length > 0) {
+          target = list.find(t => {
+            if (!t || String(t.id).startsWith('TMP-') || String(t.serviceId).startsWith('TMP-')) return false;
+            if ((t.patientName || '').trim() !== fallbackPatient.trim()) return false;
+            // 병원명 또는 간병인명 추가 일치 여부 확인 (있으면 가산)
+            if (fallbackCarer && t.caregiverName && t.caregiverName.trim() === fallbackCarer.trim()) return true;
+            if (fallbackHospital && t.hospitalName && t.hospitalName.includes(fallbackHospital.slice(0, 4))) return true;
+            return true;
+          });
+        }
+      } catch (_) {}
+    }
+
+    // 4. 그래도 대상을 찾을 수 없는 경우에만 임시 Fallback 구성
     if (!target && fallbackPatient) {
       target = {
         id: token ? `TMP-${token}` : `TMP-${Date.now()}`,

@@ -1671,6 +1671,68 @@ async function loadSurveyMgmtData(showToastAlert = false) {
       return t;
     });
 
+    // [임시/단축코드 고아 응답 자동 화해(Reconciliation) 엔진]
+    // 모바일 단축링크나 웹뷰 등에서 일시적으로 TMP- 타겟으로 제출된 응답을 전화번호/환자명 기준으로 정규 타겟에 안전하게 병합
+    const orphanSubmitted = gSurveyState.targets.filter(t => t && t.id && (String(t.id).startsWith('TMP-') || String(t.serviceId).startsWith('TMP-')) && t.responseStatus === 'SUBMITTED');
+    if (orphanSubmitted.length > 0) {
+      orphanSubmitted.forEach(orphan => {
+        const orphanDigits = String(orphan.couponPhone || orphan.patientPhone || '').replace(/[^0-9]/g, '');
+        const orphanName = (orphan.patientName || '').trim();
+        const regularTarget = gSurveyState.targets.find(t => {
+          if (!t || t.id === orphan.id || String(t.id).startsWith('TMP-') || String(t.serviceId).startsWith('TMP-')) return false;
+          const tDigits = String(t.patientPhone || t.couponPhone || '').replace(/[^0-9]/g, '');
+          if (orphanDigits && orphanDigits.length >= 9 && tDigits && tDigits.length >= 9 && orphanDigits === tDigits) {
+            return true;
+          }
+          if (orphanName && t.patientName && orphanName === t.patientName.trim()) {
+            return true;
+          }
+          return false;
+        });
+
+        if (regularTarget) {
+          regularTarget.responseStatus = 'SUBMITTED';
+          if (orphan.answers && Object.keys(orphan.answers).length > 0) regularTarget.answers = orphan.answers;
+          if (orphan.avgRating) regularTarget.avgRating = orphan.avgRating;
+          if (orphan.q2Score !== undefined) regularTarget.q2Score = orphan.q2Score;
+          if (orphan.q3Score !== undefined) regularTarget.q3Score = orphan.q3Score;
+          if (orphan.q3Unknown !== undefined) regularTarget.q3Unknown = orphan.q3Unknown;
+          if (orphan.q4Score !== undefined) regularTarget.q4Score = orphan.q4Score;
+          if (orphan.q4Unknown !== undefined) regularTarget.q4Unknown = orphan.q4Unknown;
+          if (orphan.surveyComment) regularTarget.surveyComment = orphan.surveyComment;
+          if (orphan.couponPhone) regularTarget.couponPhone = orphan.couponPhone;
+          if (orphan.respondentType) regularTarget.respondentType = orphan.respondentType;
+          if (orphan.submittedAt) regularTarget.submittedAt = orphan.submittedAt;
+          regularTarget.giftStatus = (orphan.giftStatus && orphan.giftStatus !== 'NONE') ? orphan.giftStatus : 'PENDING';
+
+          // Convex 클라우드 DB에도 정규 타겟 업데이트 및 고아 TMP 레코드 정리
+          if (typeof syncToConvex === 'function') {
+            syncToConvex('sync:updateSurveyTarget', {
+              id: regularTarget.id,
+              updates: {
+                responseStatus: 'SUBMITTED',
+                answers: regularTarget.answers,
+                avgRating: regularTarget.avgRating,
+                q2Score: regularTarget.q2Score,
+                q3Score: regularTarget.q3Score,
+                q3Unknown: regularTarget.q3Unknown,
+                q4Score: regularTarget.q4Score,
+                q4Unknown: regularTarget.q4Unknown,
+                surveyComment: regularTarget.surveyComment,
+                couponPhone: regularTarget.couponPhone,
+                respondentType: regularTarget.respondentType,
+                submittedAt: regularTarget.submittedAt,
+                giftStatus: regularTarget.giftStatus,
+                updatedAt: new Date().toISOString()
+              }
+            }).catch(() => {});
+            syncToConvex('sync:deleteSurveyTarget', { id: orphan.id }).catch(() => {});
+          }
+        }
+      });
+      gSurveyState.targets = gSurveyState.targets.filter(t => !String(t.id).startsWith('TMP-') && !String(t.serviceId).startsWith('TMP-'));
+    }
+
     // 기본 정렬: 최근 간병 종료 고객 및 최근 등록순 최우선 맨 위 배치
     gSurveyState.targets.sort((a, b) => {
       const aRecent = isTargetRecentlyAdded(a);
@@ -3948,9 +4010,9 @@ function getSurveyTargetUrlForSms(target) {
   if (target && target.patientName) {
     const cleanHosp = cleanSurveyHospitalName(target.hospitalName, target);
     const cgName = target.caregiverName || '';
-    return `${baseUrl}?p=${encodeURIComponent(target.patientName)}&h=${encodeURIComponent(cleanHosp)}&c=${encodeURIComponent(cgName)}`;
+    return `${baseUrl}?t=${shortCode}&p=${encodeURIComponent(target.patientName)}&h=${encodeURIComponent(cleanHosp)}&c=${encodeURIComponent(cgName)}`;
   }
-  return baseUrl;
+  return `${baseUrl}?t=${shortCode}`;
 }
 
 function switchSurveySmsChannelMode(channelMode = 'sms') {

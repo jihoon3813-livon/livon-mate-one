@@ -144,6 +144,17 @@ module.exports = async function handler(req, res) {
             (token.length >= 6 && t.id && t.id.replace(/^ST-/, '') === token))) ||
           (t.tokenHash && token && t.tokenHash.startsWith(token))
         );
+
+        // 만약 targetId가 TMP- 형태이거나 매칭되지 않은 경우, 제출된 쿠폰/환자 연락처로 기존 정규 대상자 자동 매칭
+        const rawDigits = couponPhone.replace(/[^0-9]/g, '');
+        if (!matchedTarget && rawDigits.length >= 9) {
+          matchedTarget = list.find(t => {
+            if (!t || String(t.id).startsWith('TMP-') || String(t.serviceId).startsWith('TMP-')) return false;
+            const tPhone = (t.patientPhone || '').replace(/[^0-9]/g, '');
+            const tCoupon = (t.couponPhone || '').replace(/[^0-9]/g, '');
+            return (tPhone && tPhone === rawDigits) || (tCoupon && tCoupon === rawDigits);
+          });
+        }
       }
     } catch (e) {
       console.warn('[Survey Submit] Convex find target error:', e.message);

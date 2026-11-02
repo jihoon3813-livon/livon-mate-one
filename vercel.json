@@ -76,7 +76,7 @@
     },
     {
       "source": "/s/:token",
-      "destination": "/survey-care-diary.html"
+      "destination": "/survey-care-diary.html?t=:token"
     },
     {
       "source": "/s",
