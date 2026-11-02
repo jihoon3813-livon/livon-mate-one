@@ -3734,46 +3734,29 @@ async function handleSaveSettlementSet(e) {
       syncToConvex('sync:saveApplication', { app }).catch(console.warn);
     }
 
-    // Sync to Node Server backend (/api/hub/customer/update-fields & /api/hub/real-data)
-    try {
-      await fetch('/api/hub/customer/update-fields', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          appId: app.id,
-          fields: {
-            customSettlementSets: app.customSettlementSets,
-            claimCount: app.claimCount,
-            unconfirmedClaimCount: app.unconfirmedClaimCount,
-            estimatedUnpaid: app.estimatedUnpaid,
-            totalPayout: app.totalPayout,
-            hasManualUpdate: true,
-            status: app.status,
-            claimClassification: app.claimClassification,
-            claimCategory: app.claimCategory,
-            claim: matchedClaim,
-            payout: matchedPayout
-          }
-        })
-      });
-    } catch (e) {
+    // Sync to Node Server backend (/api/hub/customer/update-fields 비동기 전송, 중복 2MB real-data 덤프 제거)
+    fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: {
+          customSettlementSets: app.customSettlementSets,
+          claimCount: app.claimCount,
+          unconfirmedClaimCount: app.unconfirmedClaimCount,
+          estimatedUnpaid: app.estimatedUnpaid,
+          totalPayout: app.totalPayout,
+          hasManualUpdate: true,
+          status: app.status,
+          claimClassification: app.claimClassification,
+          claimCategory: app.claimCategory,
+          claim: matchedClaim,
+          payout: matchedPayout
+        }
+      })
+    }).catch(e => {
       console.warn('[handleSaveSettlementSet] update-fields error:', e);
-    }
-
-    try {
-      await fetch('/api/hub/real-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          applications: gApps,
-          assignments: gAssigns,
-          claims: gClaims,
-          payouts: gPayouts
-        })
-      });
-    } catch (e) {
-      console.warn('[handleSaveSettlementSet] real-data sync error:', e);
-    }
+    });
 
     if (typeof gHdForm02CustomState !== 'undefined' && gHdForm02CustomState.customerOverrides && gHdForm02CustomState.customerOverrides[appId]) {
       delete gHdForm02CustomState.customerOverrides[appId].servicePeriods;
@@ -3941,43 +3924,26 @@ async function deleteSettlementSet(appId, setIndex) {
     console.warn('localStorage save warning:', e);
   }
 
-  // 9. Persist to backend server (/api/hub/customer/update-fields & /api/hub/real-data)
-  try {
-    await fetch('/api/hub/customer/update-fields', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        appId: app.id,
-        fields: {
-          customSettlementSets: app.customSettlementSets,
-          claimCount: app.claimCount,
-          unconfirmedClaimCount: app.unconfirmedClaimCount,
-          estimatedUnpaid: app.estimatedUnpaid,
-          totalPayout: app.totalPayout,
-          hasManualUpdate: true,
-          deleteClaimIds: deletedClaimIds,
-          deletePayoutIds: deletedPayoutIds
-        }
-      })
-    });
-  } catch (e) {
+  // 9. Persist to backend server (/api/hub/customer/update-fields 비동기 전송, 중복 2MB real-data 덤프 제거)
+  fetch('/api/hub/customer/update-fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appId: app.id,
+      fields: {
+        customSettlementSets: app.customSettlementSets,
+        claimCount: app.claimCount,
+        unconfirmedClaimCount: app.unconfirmedClaimCount,
+        estimatedUnpaid: app.estimatedUnpaid,
+        totalPayout: app.totalPayout,
+        hasManualUpdate: true,
+        deleteClaimIds: deletedClaimIds,
+        deletePayoutIds: deletedPayoutIds
+      }
+    })
+  }).catch(e => {
     console.warn('[deleteSettlementSet] update-fields error:', e);
-  }
-
-  try {
-    await fetch('/api/hub/real-data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        applications: gApps,
-        assignments: gAssigns,
-        claims: gClaims,
-        payouts: gPayouts
-      })
-    });
-  } catch (e) {
-    console.warn('[deleteSettlementSet] real-data sync error:', e);
-  }
+  });
 
   // 10. Persist to Convex Cloud
   if (typeof syncToConvex === 'function') {
@@ -4226,45 +4192,29 @@ async function saveActiveHubCustomerDetail(silent = false, targetAppId = null) {
     syncToConvex('sync:saveApplication', { app }).catch(console.warn);
   }
 
-  // 6. Save to Node Server: update-fields
-  try {
-    await fetch('/api/hub/customer/update-fields', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        appId: app.id,
-        fields: {
-          customSettlementSets: app.customSettlementSets,
-          claimCount: app.claimCount,
-          unconfirmedClaimCount: app.unconfirmedClaimCount,
-          estimatedUnpaid: app.estimatedUnpaid,
-          totalPayout: app.totalPayout,
-          hasManualUpdate: true,
-          status: app.status,
-          claimClassification: app.claimClassification,
-          claimCategory: app.claimCategory
-        }
-      })
-    });
-  } catch (e) {
+  // 6. Save to Node Server: update-fields (비동기 전송 및 해당 고객 claims/payouts 동시 반영, 중복 2MB real-data 덤프 제거)
+  fetch('/api/hub/customer/update-fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appId: app.id,
+      fields: {
+        customSettlementSets: app.customSettlementSets,
+        claimCount: app.claimCount,
+        unconfirmedClaimCount: app.unconfirmedClaimCount,
+        estimatedUnpaid: app.estimatedUnpaid,
+        totalPayout: app.totalPayout,
+        hasManualUpdate: true,
+        status: app.status,
+        claimClassification: app.claimClassification,
+        claimCategory: app.claimCategory,
+        claims: remainingAppClaims,
+        payouts: remainingAppPayouts
+      }
+    })
+  }).catch(e => {
     console.warn('[saveActiveHubCustomerDetail] update-fields error:', e);
-  }
-
-  // 7. Save to Node Server: real-data (persists hub_apps_real.json directly)
-  try {
-    await fetch('/api/hub/real-data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        applications: gApps,
-        assignments: gAssigns,
-        claims: gClaims,
-        payouts: gPayouts
-      })
-    });
-  } catch (e) {
-    console.warn('[saveActiveHubCustomerDetail] real-data sync error:', e);
-  }
+  });
 
   // 8. Button feedback (오직 모달이 열려있고 대상 고객이 일치할 때만 피드백 노출)
   const modalEl = document.getElementById('hubCustomerDetailModal');
@@ -5604,26 +5554,24 @@ function reconcileAppsWithActiveAssignments(targetApps = null, targetAssigns = n
         updatedAny = true;
       }
       const targetEndDate = (activeAssign.endDate !== undefined && activeAssign.endDate !== null) ? activeAssign.endDate : '';
-      if (app.careEndDate !== targetEndDate) {
-        const pAppEnd = app.careEndDate ? ((typeof parseCareDateTime === 'function') ? parseCareDateTime(app.careEndDate) : null) : null;
+      if (app.careEndDate) {
+        const pAppEnd = (typeof parseCareDateTime === 'function') ? parseCareDateTime(app.careEndDate) : null;
         const pTargetEnd = targetEndDate ? ((typeof parseCareDateTime === 'function') ? parseCareDateTime(targetEndDate) : null) : null;
-        const now = new Date();
-        const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const isAppEndFuture = app.careEndDate === '진행중' || (pAppEnd && (new Date(pAppEnd.getFullYear(), pAppEnd.getMonth(), pAppEnd.getDate()) > todayZero || (new Date(pAppEnd.getFullYear(), pAppEnd.getMonth(), pAppEnd.getDate()).getTime() === todayZero.getTime() && now <= pAppEnd)));
-        const isTargetPastOrInverted = pTargetEnd && (new Date(pTargetEnd.getFullYear(), pTargetEnd.getMonth(), pTargetEnd.getDate()) < todayZero || (activeAssign.startDate && pTargetEnd <= parseCareDateTime(activeAssign.startDate)));
-
-        if (!isAppEndFuture || !isTargetPastOrInverted) {
-          app.careEndDate = targetEndDate;
-          updatedAny = true;
-        } else if (isAppEndFuture && isTargetPastOrInverted) {
-          // ⚡ 배정 대장 종료일이 당일/과거로 축소되어 있고 신청서가 미래 종료일인 경우 -> 배정 종료일을 신청서 종료일로 보정
+        if (pAppEnd && (!pTargetEnd || pAppEnd > pTargetEnd)) {
+          // ⚡ [신청서 간병종료 예정일 우선 동기화]: 배정 종료일이 신청서 종료일보다 짧거나 과거인 경우 즉시 신청서 기준으로 동기화
           const formattedAppEnd = app.careEndDate.includes(':') ? app.careEndDate : app.careEndDate.replace(/-/g, '.') + ' 09:00';
           activeAssign.endDate = formattedAppEnd;
           activeAssign.updatedAt = new Date().toISOString();
           if (typeof syncToConvex === 'function') {
             syncToConvex('sync:saveAssignment', { assignment: activeAssign }).catch(() => {});
           }
+        } else if (!app.careEndDate && targetEndDate) {
+          app.careEndDate = targetEndDate;
+          updatedAny = true;
         }
+      } else if (targetEndDate) {
+        app.careEndDate = targetEndDate;
+        updatedAny = true;
       }
     }
 
@@ -14360,6 +14308,21 @@ function renderUnifiedCareHub() {
     let as = (typeof getActiveCaregiverAssignment === 'function')
       ? getActiveCaregiverAssignment(app, appAssigns)
       : (appAssigns.length > 0 ? appAssigns[appAssigns.length - 1] : null);
+
+    // ⚡ [요약보기 카드 렌더링 시 신청서 간병종료 예정일 실시간 동기화]
+    if (as && app && app.careEndDate) {
+      const pAppEnd = (typeof parseCareDateTime === 'function') ? parseCareDateTime(app.careEndDate) : null;
+      const pAsEnd = as.endDate ? ((typeof parseCareDateTime === 'function') ? parseCareDateTime(as.endDate) : null) : null;
+      if (pAppEnd && (!pAsEnd || pAppEnd > pAsEnd)) {
+        const formattedAppEnd = app.careEndDate.includes(':') ? app.careEndDate : app.careEndDate.replace(/-/g, '.') + ' 09:00';
+        as.endDate = formattedAppEnd;
+        as.updatedAt = new Date().toISOString();
+        if (typeof syncToConvex === 'function') {
+          syncToConvex('sync:saveAssignment', { assignment: as }).catch(() => {});
+        }
+      }
+    }
+
     const s2_assign = as 
       ? { label: maskName(as.caregiverName) + ' 배정 (' + (as.centerName || '개인') + ')', color: 'emerald', count: Math.max(appAssigns.length, 1) }
       : (app.status === '완료' || app.status === '정산완료' 
