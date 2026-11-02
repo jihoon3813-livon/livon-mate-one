@@ -5371,13 +5371,41 @@ function determineRealCareStatus(app, specificAssigns) {
     return '제외';
   }
 
+  const now = new Date();
+  const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
   // 2. 간병 배정 및 진행 정보 조회
   const as = getActiveCaregiverAssignment(app, specificAssigns);
   const careProg = as ? getCareProgressInfo(as) : null;
 
-  // [사용자 요구사항]: 간병일정이 끝났으면(배정 종료일 경과) 분류관리를 자동으로 '완료'로 변경!
+  // 신청서 기준 간병 종료일 확인
+  const appCareEnd = String(app.careEndDate || '').trim();
+  const pAppEnd = appCareEnd ? ((typeof parseCareDateTime === 'function') ? parseCareDateTime(appCareEnd) : (typeof parseCareDate === 'function' ? parseCareDate(appCareEnd) : null)) : null;
+  const isAppCareEndOngoingOrFuture = Boolean(
+    appCareEnd === '진행중' || appCareEnd === '예정' ||
+    (pAppEnd && (new Date(pAppEnd.getFullYear(), pAppEnd.getMonth(), pAppEnd.getDate()) > todayZero || (new Date(pAppEnd.getFullYear(), pAppEnd.getMonth(), pAppEnd.getDate()).getTime() === todayZero.getTime() && now <= pAppEnd)))
+  );
+
+  // 관리자가 명시적으로 진행중으로 관리 중인 경우 (수동 지정 또는 원본 진행중)
+  const isExplicitlyOngoing = rawSt === '진행중' || rawSt === '진행' || rawSt === '간병진행중';
+
+  // [수동 설정값 반영]: 간병일정이 명백히 종료된 건이 아니라면 수동 설정값 유지
+  if (app.hasManualUpdate && app.status) {
+    if (app.status === '진행중' || app.status === '배정대기' || app.status === '예정' || app.status === '신규') {
+      if (isAppCareEndOngoingOrFuture || !pAppEnd || isExplicitlyOngoing) {
+        return app.status;
+      }
+    } else {
+      return app.status;
+    }
+  }
+
+  // [간병 완료 자동 판정]: 개별 배정과 신청서 간병기간 모두 종료된 경우에만 자동으로 '완료' 판정!
+  // (신청서의 간병 종료일이 미래이거나 '진행중'인 경우, 또는 관리자가 '진행중'으로 관리 중인 건은 배정 대장의 단기 일자로 덮어쓰지 않음)
   if (careProg && careProg.status === 'completed') {
-    return '완료';
+    if (!isAppCareEndOngoingOrFuture && !isExplicitlyOngoing) {
+      return '완료';
+    }
   }
 
   // as가 존재하는 경우 as의 시작/종료일시를 엄격히 적용
@@ -5396,19 +5424,14 @@ function determineRealCareStatus(app, specificAssigns) {
   if (eTrim && eTrim !== '진행중' && eTrim !== '예정' && eTrim !== '-') {
     const pEnd = (typeof parseCareDateTime === 'function') ? parseCareDateTime(eTrim) : null;
     if (pEnd) {
-      const now = new Date();
-      const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const eZero = new Date(pEnd.getFullYear(), pEnd.getMonth(), pEnd.getDate());
       const hasSpecificTime = eTrim.includes(':');
       if (eZero < todayZero || (eZero.getTime() === todayZero.getTime() && hasSpecificTime && now >= pEnd)) {
-        return '완료';
+        if (!isAppCareEndOngoingOrFuture && !isExplicitlyOngoing) {
+          return '완료';
+        }
       }
     }
-  }
-
-  // [수동 설정값 반영]: 간병일정이 종료되지 않은 진행중/대기 건에 한해 수동 설정값 유지
-  if (app.hasManualUpdate && app.status) {
-    return app.status;
   }
 
   if (!specificAssigns && app._renderCareStatus) {
@@ -5431,8 +5454,6 @@ function determineRealCareStatus(app, specificAssigns) {
     if (eTrim && eTrim !== '진행중' && eTrim !== '-') {
       const pEnd = (typeof parseCareDateTime === 'function') ? parseCareDateTime(eTrim) : (typeof parseCareDate === 'function' ? parseCareDate(eTrim) : null);
       if (pEnd) {
-        const now = new Date();
-        const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const eZero = new Date(pEnd.getFullYear(), pEnd.getMonth(), pEnd.getDate());
         if (eZero < todayZero || (eZero.getTime() === todayZero.getTime() && now >= pEnd)) {
           return '완료';
@@ -5454,12 +5475,10 @@ function determineRealCareStatus(app, specificAssigns) {
   if (!sDate || (!as && !app.caregiverName)) {
     if (rawSt.includes('취소') || rawSt.includes('철회')) return '취소';
     if (rawSt.includes('미해당')) return '미해당';
+    if (isExplicitlyOngoing) return '진행중';
     if (app.isPreRegistered || rawSt.includes('대기')) return '배정대기';
     return rawSt || '신규';
   }
-
-  const now = new Date();
-  const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   // 3. 간병 시작일시가 오늘 이후(미래)인 경우 -> '예정' (단, 이전 배정에서 교체 진행 중인 건은 '진행중')
   const pStart = (typeof parseCareDateTime === 'function') ? parseCareDateTime(sDate) : (typeof parseCareDate === 'function' ? parseCareDate(sDate) : null);
@@ -5513,13 +5532,21 @@ function determineRealCareStatus(app, specificAssigns) {
       if (hasUpcomingSuccessor) {
         return '진행중';
       }
+      if (isAppCareEndOngoingOrFuture || isExplicitlyOngoing) {
+        return '진행중';
+      }
       return '완료'; // 오늘 날짜 이전이거나 오늘의 지정 시간을 경과한 경우 완료!
     }
     return '진행중'; // 오늘 날짜 이후까지 일정이 남아있거나 오늘 진행중이면 진행중!
   }
 
+  if (isAppCareEndOngoingOrFuture || isExplicitlyOngoing) {
+    return '진행중';
+  }
+
   return '완료';
 }
+
 window.determineRealCareStatus = determineRealCareStatus;
 
 /**
@@ -5578,18 +5605,29 @@ function reconcileAppsWithActiveAssignments(targetApps = null, targetAssigns = n
       }
       const targetEndDate = (activeAssign.endDate !== undefined && activeAssign.endDate !== null) ? activeAssign.endDate : '';
       if (app.careEndDate !== targetEndDate) {
-        app.careEndDate = targetEndDate;
-        updatedAny = true;
+        const pAppEnd = app.careEndDate ? ((typeof parseCareDateTime === 'function') ? parseCareDateTime(app.careEndDate) : null) : null;
+        const pTargetEnd = targetEndDate ? ((typeof parseCareDateTime === 'function') ? parseCareDateTime(targetEndDate) : null) : null;
+        const now = new Date();
+        const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const isAppEndFuture = app.careEndDate === '진행중' || (pAppEnd && (new Date(pAppEnd.getFullYear(), pAppEnd.getMonth(), pAppEnd.getDate()) > todayZero || (new Date(pAppEnd.getFullYear(), pAppEnd.getMonth(), pAppEnd.getDate()).getTime() === todayZero.getTime() && now <= pAppEnd)));
+        const isTargetPastOrInverted = pTargetEnd && (new Date(pTargetEnd.getFullYear(), pTargetEnd.getMonth(), pTargetEnd.getDate()) < todayZero || (activeAssign.startDate && pTargetEnd <= parseCareDateTime(activeAssign.startDate)));
+
+        if (!isAppEndFuture || !isTargetPastOrInverted) {
+          app.careEndDate = targetEndDate;
+          updatedAny = true;
+        }
       }
     }
 
     const isAlreadyCompleted = String(app.status || app.rawStatus || '').includes('완료') || String(app.status || app.rawStatus || '').includes('종료');
     const realStatus = (typeof determineRealCareStatus === 'function') ? determineRealCareStatus(app, appAssigns) : null;
     if (realStatus && app.status !== realStatus) {
-      // [사용자 요구사항]: 간병일정이 끝나면 자동으로 '완료'로 변경 (수동 플래그와 무관하게 일정이 끝나면 완료 반영)
       if (realStatus === '완료') {
-        app.status = '완료';
-        updatedAny = true;
+        const isExplicitlyOngoing = app.status === '진행중' || app.status === '간병진행중';
+        if (!isExplicitlyOngoing) {
+          app.status = '완료';
+          updatedAny = true;
+        }
       } else if (!app.hasManualUpdate) {
         if (isAlreadyCompleted && realStatus === '진행중') {
           // 이미 완료된 건은 진행중으로 뒤집지 않음
@@ -12877,6 +12915,9 @@ function renderUnifiedCareHub() {
 
   // 1. 원수사 탭 뱃지 총 건수 산출 (실데이터 C-계열, D-계열 및 정상 등록 건 전수 포함)
   const activeHubApps = (gApps || []).filter(x => x && x.id && (!String(x.id).startsWith('S') || x.isRealLaunchData));
+  for (let i = 0; i < activeHubApps.length; i++) {
+    delete activeHubApps[i]._renderCareStatus;
+  }
 
   // [CTI 중복 노출 방지]: 동일인 다중 리스트 중 가장 최근 등록건 식별 Set 갱신
   if (typeof getLatestCustomerAppIdSet === 'function') {
