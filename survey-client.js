@@ -2067,6 +2067,97 @@ function renderGiftSummaryCellHtml(target) {
   `;
 }
 
+// =========================================================================
+// 0-SELECT. 만족도조사 대상자 체크박스 다중 선택 및 일괄 발송 관리
+// =========================================================================
+const gSelectedSurveyTargetIds = new Set();
+
+function updateSelectedSurveyTargetsUI() {
+  const countEl = document.getElementById('surveySelectedTargetsCount');
+  const btnEl = document.getElementById('btnSendSelectedSurveyTargets');
+  const count = gSelectedSurveyTargetIds.size;
+  if (countEl) countEl.innerText = count;
+  if (btnEl) {
+    if (count > 0) {
+      btnEl.classList.remove('hidden');
+    } else {
+      btnEl.classList.add('hidden');
+    }
+  }
+
+  const masterCb = document.getElementById('checkAllSurveyTargets_new');
+  if (masterCb) {
+    const visibleCheckboxes = document.querySelectorAll('.survey-target-new-checkbox');
+    if (visibleCheckboxes.length > 0) {
+      const checkedCount = Array.from(visibleCheckboxes).filter(cb => cb.checked).length;
+      masterCb.checked = (checkedCount === visibleCheckboxes.length);
+      masterCb.indeterminate = (checkedCount > 0 && checkedCount < visibleCheckboxes.length);
+    } else {
+      masterCb.checked = false;
+      masterCb.indeterminate = false;
+    }
+  }
+}
+
+function onSurveyTargetCheckboxChange(targetId, isChecked) {
+  if (isChecked) {
+    gSelectedSurveyTargetIds.add(targetId);
+  } else {
+    gSelectedSurveyTargetIds.delete(targetId);
+  }
+  updateSelectedSurveyTargetsUI();
+}
+
+function toggleSelectAllSurveyTargets(isChecked) {
+  const visibleCheckboxes = document.querySelectorAll('.survey-target-new-checkbox');
+  visibleCheckboxes.forEach(cb => {
+    cb.checked = isChecked;
+    const tId = cb.getAttribute('data-target-id');
+    if (tId) {
+      if (isChecked) gSelectedSurveyTargetIds.add(tId);
+      else gSelectedSurveyTargetIds.delete(tId);
+    }
+  });
+  updateSelectedSurveyTargetsUI();
+}
+
+function onBatchModalCandidateCheckChange() {
+  const checkboxes = document.querySelectorAll('.batch-modal-candidate-check');
+  const checkedBoxes = document.querySelectorAll('.batch-modal-candidate-check:checked');
+  const countEl = document.getElementById('batchSmsTargetCount');
+  if (countEl) countEl.innerText = checkedBoxes.length;
+
+  const masterCb = document.getElementById('checkAllBatchModalCandidates');
+  if (masterCb) {
+    masterCb.checked = (checkedBoxes.length === checkboxes.length && checkboxes.length > 0);
+    masterCb.indeterminate = (checkedBoxes.length > 0 && checkedBoxes.length < checkboxes.length);
+  }
+
+  checkboxes.forEach(cb => {
+    const row = document.getElementById('batchModalRow_' + cb.getAttribute('data-target-id'));
+    if (row) {
+      if (cb.checked) {
+        row.classList.remove('opacity-40', 'bg-slate-100/60');
+      } else {
+        row.classList.add('opacity-40', 'bg-slate-100/60');
+      }
+    }
+  });
+}
+
+function toggleSelectAllBatchModal(isChecked) {
+  const checkboxes = document.querySelectorAll('.batch-modal-candidate-check');
+  checkboxes.forEach(cb => cb.checked = isChecked);
+  onBatchModalCandidateCheckChange();
+}
+
+function removeBatchModalCandidate(targetId) {
+  toggleSurveyCandidate(targetId);
+  const row = document.getElementById('batchModalRow_' + targetId);
+  if (row) row.remove();
+  onBatchModalCandidateCheckChange();
+}
+
 function renderSurveyTargetsTable(list) {
   const tbody = document.getElementById('surveyTargetsTableBody');
   const tbodyNew = document.getElementById('surveyTargetsTableBody_new');
@@ -2175,7 +2266,17 @@ function renderSurveyTargetsTable(list) {
 
       return `
         <tr class="${rowClass}">
-          <td class="p-3 text-center font-mono text-slate-400 text-[11px]">${idx + 1}</td>
+          <td class="p-3 text-center font-mono text-slate-400 text-[11px]">
+            ${isNewTable ? `
+              <div class="flex items-center justify-center gap-1.5">
+                <input type="checkbox" class="survey-target-new-checkbox w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer" 
+                  data-target-id="${target.id}" 
+                  ${gSelectedSurveyTargetIds.has(target.id) ? 'checked' : ''} 
+                  onchange="onSurveyTargetCheckboxChange('${target.id}', this.checked)">
+                <span>${idx + 1}</span>
+              </div>
+            ` : `${idx + 1}`}
+          </td>
           <td class="p-3 text-center whitespace-nowrap">${candidateCellHtml}</td>
           <td class="p-3 font-mono font-bold text-rose-700 whitespace-nowrap">${displayAppId}</td>
           <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
@@ -2312,6 +2413,7 @@ function renderSurveyTargetsTable(list) {
   if (tbodyNew) tbodyNew.innerHTML = buildRowsHtml(true);
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
+  updateSelectedSurveyTargetsUI();
 }
 
 // =========================================================================
@@ -6065,11 +6167,26 @@ function switchBatchSmsChannel(channelMode = 'kakao') {
   }
 }
 
-function openBatchCandidateSmsModal() {
-  const candidates = (gSurveyState.targets || []).filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED');
-  if (candidates.length === 0) {
-    alert('현재 지정된 발송 후보가 없습니다.\n\n고객 목록에서 [후보추가] 버튼이나 [스마트 후보 자동선별] 버튼을 먼저 눌러 대상을 지정해 주세요.');
-    return;
+function openBatchCandidateSmsModal(selectedOnly = false) {
+  let candidates = [];
+  if (selectedOnly) {
+    candidates = (gSurveyState.targets || []).filter(t => gSelectedSurveyTargetIds.has(t.id) && t.excludeStatus !== 'EXCLUDED');
+    if (candidates.length === 0) {
+      alert('체크된 발송 대상이 없습니다.\n\n목록의 체크박스를 눌러 발송할 고객을 선택해 주세요.');
+      return;
+    }
+  } else {
+    // 1) 체크된 항목이 있으면 체크된 항목 우선, 없으면 후보군 전체
+    if (gSelectedSurveyTargetIds.size > 0) {
+      candidates = (gSurveyState.targets || []).filter(t => gSelectedSurveyTargetIds.has(t.id) && t.excludeStatus !== 'EXCLUDED');
+    }
+    if (candidates.length === 0) {
+      candidates = (gSurveyState.targets || []).filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED');
+    }
+    if (candidates.length === 0) {
+      alert('현재 지정된 발송 후보 또는 선택된 고객이 없습니다.\n\n목록에서 체크박스로 선택하거나 [후보추가] 버튼으로 대상을 지정해 주세요.');
+      return;
+    }
   }
 
   const modal = document.getElementById('surveyBatchCandidateSmsModal');
@@ -6094,20 +6211,30 @@ function openBatchCandidateSmsModal() {
       const endDate = formatSurveyDate(t.careEndDate);
       const cName = t.caregiverName || '미지정';
       return `
-        <tr class="hover:bg-pink-50/50">
+        <tr class="hover:bg-pink-50/50 transition-all batch-modal-row" id="batchModalRow_${t.id}">
+          <td class="p-2.5 text-center">
+            <input type="checkbox" class="batch-modal-candidate-check w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer" 
+              data-target-id="${t.id}" checked onchange="onBatchModalCandidateCheckChange()">
+          </td>
           <td class="p-2.5 text-center font-mono text-slate-400 text-[11px]">${idx + 1}</td>
           <td class="p-2.5 font-bold text-slate-900 whitespace-nowrap">${pName}</td>
           <td class="p-2.5 font-mono text-rose-700 font-bold whitespace-nowrap">${phone || '연락처없음'}</td>
           <td class="p-2.5 text-slate-600 whitespace-nowrap">${hosp} (${endDate})</td>
           <td class="p-2.5 whitespace-nowrap text-slate-700 font-medium">${cName}</td>
           <td class="p-2.5 text-center whitespace-nowrap">
-            <button type="button" onclick="toggleSurveyCandidate('${t.id}'); openBatchCandidateSmsModal();" class="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer" title="발송 후보에서 제외">
+            <button type="button" onclick="removeBatchModalCandidate('${t.id}')" class="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer" title="발송 목록에서 제외">
               <i data-lucide="x" class="w-3.5 h-3.5"></i>
             </button>
           </td>
         </tr>
       `;
     }).join('');
+  }
+
+  const masterCb = document.getElementById('checkAllBatchModalCandidates');
+  if (masterCb) {
+    masterCb.checked = true;
+    masterCb.indeterminate = false;
   }
 
   if (modal) modal.classList.remove('hidden');
@@ -6120,9 +6247,17 @@ function closeBatchCandidateSmsModal() {
 }
 
 async function executeBatchCandidateSms() {
-  const candidates = (gSurveyState.targets || []).filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED');
+  // 모달 내부에서 체크박스로 선택된 대상자만 추출
+  const checkedBoxes = Array.from(document.querySelectorAll('.batch-modal-candidate-check:checked'));
+  const checkedIds = new Set(checkedBoxes.map(cb => cb.getAttribute('data-target-id')).filter(Boolean));
+  
+  let candidates = (gSurveyState.targets || []).filter(t => checkedIds.has(t.id) && t.excludeStatus !== 'EXCLUDED');
   if (candidates.length === 0) {
-    alert('발송 대상 후보가 없습니다.');
+    // 모달 체크박스가 없거나 0개면 후보군 대상 폴백
+    candidates = (gSurveyState.targets || []).filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED');
+  }
+  if (candidates.length === 0) {
+    alert('발송 대상 후보가 선택되지 않았습니다. 최소 1명 이상 체크해 주세요.');
     return;
   }
 
@@ -6265,6 +6400,10 @@ async function executeBatchCandidateSms() {
     await new Promise(r => setTimeout(r, 150));
   }
 
+  // 발송된 대상자들은 선택 Set에서도 제거
+  validTargets.forEach(t => gSelectedSurveyTargetIds.delete(t.id));
+  updateSelectedSurveyTargetsUI();
+
   persistSurveyTargets();
   updateSurveyChipCounts();
   if (typeof renderSurveyKpis === 'function') renderSurveyKpis();
@@ -6380,6 +6519,12 @@ if (typeof window !== 'undefined') {
   window.restoreExcludedSurveyTarget = restoreExcludedSurveyTarget;
   window.switchBatchSmsChannel = switchBatchSmsChannel;
   window.openBatchCandidateSmsModal = openBatchCandidateSmsModal;
+  window.toggleSelectAllSurveyTargets = toggleSelectAllSurveyTargets;
+  window.onSurveyTargetCheckboxChange = onSurveyTargetCheckboxChange;
+  window.updateSelectedSurveyTargetsUI = updateSelectedSurveyTargetsUI;
+  window.onBatchModalCandidateCheckChange = onBatchModalCandidateCheckChange;
+  window.toggleSelectAllBatchModal = toggleSelectAllBatchModal;
+  window.removeBatchModalCandidate = removeBatchModalCandidate;
   window.closeBatchCandidateSmsModal = closeBatchCandidateSmsModal;
   window.executeBatchCandidateSms = executeBatchCandidateSms;
   window.persistSurveyTargets = persistSurveyTargets;

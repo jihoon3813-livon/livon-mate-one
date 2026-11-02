@@ -5738,10 +5738,15 @@
                   <i data-lucide="filter" class="w-3.5 h-3.5"></i>
                   <span>후보만 모아보기</span>
                 </button>
-                <button type="button" onclick="openBatchCandidateSmsModal()" id="btnBatchSendCandidateSms" 
+                <button type="button" onclick="openBatchCandidateSmsModal(true)" id="btnSendSelectedSurveyTargets" 
+                  class="hidden px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-600 hover:to-rose-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer animate-pulse">
+                  <i data-lucide="check-square" class="w-3.5 h-3.5"></i>
+                  <span>선택 목록 일괄 발송 (<b id="surveySelectedTargetsCount">0</b>명)</span>
+                </button>
+                <button type="button" onclick="openBatchCandidateSmsModal(false)" id="btnBatchSendCandidateSms" 
                   class="px-4 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer">
                   <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                  <span>후보군 일괄 문자 발송 (<b id="surveyCandidateBatchCount" class="underline">0</b>명)</span>
+                  <span>후보군 일괄 발송 (<b id="surveyCandidateBatchCount" class="underline">0</b>명)</span>
                 </button>
               </div>
             </div>
@@ -5806,7 +5811,11 @@
               <table class="w-full text-left border-collapse text-xs">
                 <thead class="sticky top-0 z-20 shadow-xs">
                   <tr class="bg-pink-50 border-b border-pink-200 text-slate-800 font-extrabold select-none">
-                    <th class="p-3 text-center w-12 sticky top-0 bg-pink-50 border-b border-pink-200 z-20">#</th>
+                    <th class="p-3 text-center w-14 sticky top-0 bg-pink-50 border-b border-pink-200 z-20">
+                      <div class="flex items-center justify-center gap-1">
+                        <input type="checkbox" id="checkAllSurveyTargets_new" onchange="toggleSelectAllSurveyTargets(this.checked)" class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer" title="현재 목록 전체 선택/해제">
+                      </div>
+                    </th>
                     <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">🎯 발송후보</th>
                     <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">신청ID</th>
                     <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">환자명 / 연락처</th>
@@ -7450,6 +7459,9 @@
             <table class="w-full text-left border-collapse text-xs">
               <thead class="bg-slate-50 border-b border-slate-200 sticky top-0 font-bold text-slate-700">
                 <tr>
+                  <th class="p-2.5 text-center w-10">
+                    <input type="checkbox" id="checkAllBatchModalCandidates" onchange="toggleSelectAllBatchModal(this.checked)" checked class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer" title="전체 선택/해제">
+                  </th>
                   <th class="p-2.5 text-center w-10">#</th>
                   <th class="p-2.5">환자명</th>
                   <th class="p-2.5">수신 휴대폰번호</th>
