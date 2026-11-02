@@ -1338,15 +1338,91 @@ function showSurveyLoading(show, message = '종료 고객 최신 명단을 자�
 
 let gSurveyQuickFilter = 'ALL';
 
+function isSurveyTargetDispatched(target) {
+  if (!target || target.excludeStatus === 'EXCLUDED') return false;
+  const history = Array.isArray(target.smsSentHistory) ? target.smsSentHistory : [];
+  if (history.length > 0) {
+    const lastStatus = history[0].status;
+    if (lastStatus === 'FAILED' || lastStatus === 'ERROR') return false;
+    return true;
+  }
+  return Boolean(target.lastSmsSentAt || target.guidanceStatus === 'GUIDED');
+}
+
+function getSurveyTargetDispatchedTime(target) {
+  if (!target) return 0;
+  const history = Array.isArray(target.smsSentHistory) ? target.smsSentHistory : [];
+  const lastItem = history.length > 0 ? history[0] : null;
+  const sentTimeStr = target.lastSmsSentAt || (lastItem && lastItem.sentAt) || (target.guidanceRecord && target.guidanceRecord.occurredAt);
+  if (!sentTimeStr) return 0;
+  const ts = new Date(sentTimeStr).getTime();
+  return isNaN(ts) ? 0 : ts;
+}
+
+function ensureSurveyDispatchedFilterChip() {
+  const newChipContainer = document.getElementById('surveyQuickFilterChips_new');
+  if (newChipContainer && !newChipContainer.querySelector('[data-quick="DISPATCHED"]')) {
+    const candidateBtn = newChipContainer.querySelector('[data-quick="CANDIDATE"]');
+    const excludedBtn = newChipContainer.querySelector('[data-quick="EXCLUDED"]');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('onclick', "setSurveyQuickFilter('DISPATCHED')");
+    btn.setAttribute('data-quick', 'DISPATCHED');
+    btn.className = 'survey-quick-chip px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 flex items-center gap-1.5 cursor-pointer';
+    btn.title = '알림톡/문자 발송이 완료된 고객만 모아보기 (최신 발송 순)';
+    btn.innerHTML = `
+      <i data-lucide="send" class="w-3.5 h-3.5 text-emerald-600"></i>
+      <span>📨 발송 완료</span>
+      <span id="surveyChipCountDispatched_new" class="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10px] font-black">0</span>
+    `;
+    if (candidateBtn && candidateBtn.nextSibling) {
+      newChipContainer.insertBefore(btn, candidateBtn.nextSibling);
+    } else if (excludedBtn) {
+      newChipContainer.insertBefore(btn, excludedBtn);
+    } else {
+      newChipContainer.appendChild(btn);
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+
+  const oldChipContainer = document.getElementById('surveyQuickFilterChips');
+  if (oldChipContainer && !oldChipContainer.querySelector('[data-quick="DISPATCHED"]')) {
+    const unnotifiedBtn = oldChipContainer.querySelector('[data-quick="UNNOTIFIED"]');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('onclick', "setSurveyQuickFilter('DISPATCHED')");
+    btn.setAttribute('data-quick', 'DISPATCHED');
+    btn.className = 'survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 flex items-center gap-1.5 cursor-pointer';
+    btn.title = '알림톡/문자 발송이 완료된 고객만 모아보기 (최신 발송 순)';
+    btn.innerHTML = `
+      <i data-lucide="send" class="w-3 h-3 text-emerald-600"></i>
+      <span>📨 발송 완료</span>
+      <span id="surveyChipCountDispatched" class="px-1.5 py-0.2 rounded-full bg-emerald-200 text-emerald-900 text-[10px] font-black">0</span>
+    `;
+    if (unnotifiedBtn && unnotifiedBtn.nextSibling) {
+      oldChipContainer.insertBefore(btn, unnotifiedBtn.nextSibling);
+    } else {
+      oldChipContainer.appendChild(btn);
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
 function setSurveyQuickFilter(filterType) {
+  ensureSurveyDispatchedFilterChip();
   gSurveyQuickFilter = filterType;
   document.querySelectorAll('.survey-quick-chip').forEach(btn => {
     const q = btn.getAttribute('data-quick');
     const isNewChip = btn.closest('#surveyQuickFilterChips_new') !== null;
     if (q === filterType) {
-      btn.className = `survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${isNewChip ? 'bg-rose-600' : 'bg-sky-600'} text-white shadow-2xs flex items-center gap-1.5 cursor-pointer`;
+      const activeBg = q === 'DISPATCHED' ? 'bg-emerald-600' : (isNewChip ? 'bg-rose-600' : 'bg-sky-600');
+      btn.className = `survey-quick-chip ${isNewChip ? 'px-3.5' : 'px-3'} py-1.5 rounded-xl text-xs font-bold transition-all ${activeBg} text-white shadow-2xs flex items-center gap-1.5 cursor-pointer`;
+    } else if (isNewChip && q === 'CANDIDATE') {
+      btn.className = 'survey-quick-chip px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-pink-50 text-rose-800 border border-pink-300 hover:bg-pink-100 flex items-center gap-1.5 cursor-pointer';
+    } else if (q === 'DISPATCHED') {
+      btn.className = `survey-quick-chip ${isNewChip ? 'px-3.5' : 'px-3'} py-1.5 rounded-xl text-xs font-bold transition-all bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 flex items-center gap-1.5 cursor-pointer`;
     } else {
-      btn.className = 'survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer';
+      btn.className = `survey-quick-chip ${isNewChip ? 'px-3.5' : 'px-3'} py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer`;
     }
   });
   applySurveyFilters();
@@ -1381,6 +1457,7 @@ function resetSurveyFilters() {
 }
 
 function updateSurveyChipCounts() {
+  ensureSurveyDispatchedFilterChip();
   const targets = gSurveyState.targets || [];
   const setEl = (id, count) => {
     const el = document.getElementById(id);
@@ -1392,15 +1469,17 @@ function updateSurveyChipCounts() {
   const giftPendingCount = targets.filter(t => getEffectiveGiftStatus(t) === 'PENDING').length;
   const giftSentCount = targets.filter(t => getEffectiveGiftStatus(t) === 'SENT').length;
   const candidateCount = targets.filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED').length;
+  const dispatchedCount = targets.filter(t => isSurveyTargetDispatched(t)).length;
   const excludedCount = targets.filter(t => t.excludeStatus === 'EXCLUDED').length;
 
   const hasLogCount = targets.filter(t => hasTargetCareLog(t) && t.excludeStatus !== 'EXCLUDED').length;
   const noLogCount = targets.filter(t => !hasTargetCareLog(t) && t.excludeStatus !== 'EXCLUDED').length;
 
-  // 1) 대상자 관리 작은 탭 3개 카운트
+  // 1) 대상자 관리 작은 탭 카운트 (전체 / 발송후보 / 발송완료 / 발송제외)
   setEl('surveyChipCountAll', targets.length);
   const elCand = document.getElementById('surveyChipCountCandidate_new');
   if (elCand) elCand.innerText = candidateCount;
+  setEl('surveyChipCountDispatched', dispatchedCount);
   const elExcl = document.getElementById('surveyChipCountExcluded_new');
   if (elExcl) elExcl.innerText = excludedCount;
 
@@ -2097,9 +2176,11 @@ function applySurveyFilters() {
 
   let filtered = (gSurveyState.targets || []).slice();
 
-  // 1. 빠른 상태 필터 칩 적용 (발송 후보 & 발송 제외 통합)
+  // 1. 빠른 상태 필터 칩 적용 (발송 후보, 발송 완료 & 발송 제외 통합)
   if (gSurveyQuickFilter === 'CANDIDATE') {
     filtered = filtered.filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED');
+  } else if (gSurveyQuickFilter === 'DISPATCHED') {
+    filtered = filtered.filter(t => isSurveyTargetDispatched(t));
   } else if (gSurveyQuickFilter === 'EXCLUDED') {
     filtered = filtered.filter(t => t.excludeStatus === 'EXCLUDED');
   } else if (gSurveyQuickFilter === 'RECENT') {
@@ -2164,8 +2245,14 @@ function applySurveyFilters() {
     );
   }
 
-  // 4. 정렬 (최근 간병 종료 고객 최우선 맨 위 상단 정렬)
+  // 4. 정렬 (발송 완료 탭은 최신 발송 시각 순, 기본은 최근 간병 종료 고객 최우선 맨 위 상단 정렬)
   filtered.sort((a, b) => {
+    if (gSurveyQuickFilter === 'DISPATCHED' && filterSort === 'RECENT_FIRST') {
+      const sa = getSurveyTargetDispatchedTime(a);
+      const sb = getSurveyTargetDispatchedTime(b);
+      if (sa !== sb) return sb - sa;
+    }
+
     if (filterSort === 'RECENT_FIRST') {
       const aRecent = isTargetRecentlyAdded(a);
       const bRecent = isTargetRecentlyAdded(b);
