@@ -347,18 +347,28 @@ function parseCareDateTime(dateTimeStr) {
   if (dateTimeStr instanceof Date) return isNaN(dateTimeStr.getTime()) ? null : dateTimeStr;
   const str = String(dateTimeStr).trim().replace(/2029[.-]/g, '2026.');
   const match = str.match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})(?:[.\sT]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
-  if (!match) {
-    const d = new Date(str);
-    return isNaN(d.getTime()) ? null : d;
+  if (match) {
+    let y = parseInt(match[1], 10);
+    if (y === 2029) y = 2026;
+    const m = parseInt(match[2], 10) - 1;
+    const d = parseInt(match[3], 10);
+    const hh = match[4] !== undefined ? parseInt(match[4], 10) : 9;
+    const mm = match[5] !== undefined ? parseInt(match[5], 10) : 0;
+    const ss = match[6] !== undefined ? parseInt(match[6], 10) : 0;
+    return new Date(y, m, d, hh, mm, ss);
   }
-  let y = parseInt(match[1], 10);
-  if (y === 2029) y = 2026;
-  const m = parseInt(match[2], 10) - 1;
-  const d = parseInt(match[3], 10);
-  const hh = match[4] !== undefined ? parseInt(match[4], 10) : 9;
-  const mm = match[5] !== undefined ? parseInt(match[5], 10) : 0;
-  const ss = match[6] !== undefined ? parseInt(match[6], 10) : 0;
-  return new Date(y, m, d, hh, mm, ss);
+  // "10.07 09:00~11.01 09:00" 또는 "11.01 09:00" 형태 (연도 생략 시 현재 연도 기준 파싱)
+  const rangeMatch = str.match(/(?:~\s*)?(\d{1,2})[.-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2}))?$/);
+  if (rangeMatch) {
+    const y = new Date().getFullYear();
+    const m = parseInt(rangeMatch[1], 10) - 1;
+    const d = parseInt(rangeMatch[2], 10);
+    const hh = rangeMatch[3] !== undefined ? parseInt(rangeMatch[3], 10) : 9;
+    const mm = rangeMatch[4] !== undefined ? parseInt(rangeMatch[4], 10) : 0;
+    return new Date(y, m, d, hh, mm, 0);
+  }
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
 }
 /**
  * 시간 차이(ms)를 사람이 읽기 쉬운 포맷(일/시간/분)으로 변환
@@ -5349,44 +5359,60 @@ window.getActiveCaregiverAssignment = getActiveCaregiverAssignment;
 function determineRealCareStatus(app, specificAssigns) {
   if (!app) return '신규';
 
-  // [수동 설정값 최우선 반영] 관리자가 분류관리에서 직접 지정한 상태가 있는 경우 즉시 최우선 적용
-  if (app.hasManualUpdate && app.status) {
-    return app.status;
-  }
-
-  if (!specificAssigns && app._renderCareStatus) {
-    return app._renderCareStatus;
-  }
-
-  const as = getActiveCaregiverAssignment(app, specificAssigns);
-
-  // as가 존재하는 경우 as의 시작/종료일시를 엄격히 적용. 특히 as.endDate가 빈 문자열이면 진행중을 뜻하므로 app.careEndDate(이전 간병인의 종료일)로 fallback 금지!
-  const sDate = as ? (as.startDate || '') : (app.careStartDate || '');
-  const eDate = as ? (as.endDate !== undefined && as.endDate !== null ? as.endDate : '') : (app.careEndDate || '');
-  const eTrim = String(eDate).trim();
-
-  // 1. 특수 취소/제외/서비스불가 문구가 있는 경우 (종료일시 기준)
-  if (eTrim) {
-    if (eTrim.includes('당일서비스취소') || eTrim.includes('당일취소')) return '당일서비스취소';
-    if (eTrim.includes('서비스불가') || eTrim.includes('서비스 불가')) return '서비스불가 안내';
-    if (eTrim.includes('제외')) return '제외';
-  }
-
-  // 1-2. 신청서 원본 상태가 취소/미해당/서비스불가/제외인 경우 최우선 존중
+  // 1. 특수 취소/미해당/서비스불가/제외 상태는 최우선 존중
   const rawSt = String(app.status || app.rawStatus || '').trim();
   if (rawSt === '서비스 취소' || rawSt === '취소' || rawSt === '미해당' || rawSt === '당일서비스취소' || rawSt.includes('서비스불가') || rawSt === '제외') {
     return rawSt.includes('서비스불가') ? '서비스불가 안내' : (rawSt === '서비스 취소' ? '취소' : rawSt);
   }
 
-  // 1-2-1. 청구분류가 '제외'이거나 비활성화(보호모드)된 고객(최명자 등): 별도 수동 활성화(hasManualUpdate && 정상)하지 않는 한 '제외'로 확정하여 간병진행중에서 엄격히 배제
   const claimClassVal = String(app.claimClassification !== undefined && app.claimClassification !== null ? app.claimClassification : (app.claimCategory || '')).trim();
   const isDeactivatedOrExcluded = (claimClassVal === '제외' || app.isExcluded === true || app.isDeactivated === true);
   if (isDeactivatedOrExcluded && !(app.hasManualUpdate && claimClassVal === '정상')) {
     return '제외';
   }
 
-  if (app.hasManualUpdate && rawSt) {
-    return rawSt;
+  // 2. 간병 배정 및 진행 정보 조회
+  const as = getActiveCaregiverAssignment(app, specificAssigns);
+  const careProg = as ? getCareProgressInfo(as) : null;
+
+  // [사용자 요구사항]: 간병일정이 끝났으면(배정 종료일 경과) 분류관리를 자동으로 '완료'로 변경!
+  if (careProg && careProg.status === 'completed') {
+    return '완료';
+  }
+
+  // as가 존재하는 경우 as의 시작/종료일시를 엄격히 적용
+  const sDate = as ? (as.startDate || '') : (app.careStartDate || '');
+  const eDate = as ? (as.endDate !== undefined && as.endDate !== null ? as.endDate : '') : (app.careEndDate || '');
+  const eTrim = String(eDate).trim();
+
+  // 특수 취소/제외/서비스불가 문구가 있는 경우 (종료일시 기준)
+  if (eTrim) {
+    if (eTrim.includes('당일서비스취소') || eTrim.includes('당일취소')) return '당일서비스취소';
+    if (eTrim.includes('서비스불가') || eTrim.includes('서비스 불가')) return '서비스불가 안내';
+    if (eTrim.includes('제외')) return '제외';
+  }
+
+  // 날짜 기반 종료 여부 추가 판정
+  if (eTrim && eTrim !== '진행중' && eTrim !== '예정' && eTrim !== '-') {
+    const pEnd = (typeof parseCareDateTime === 'function') ? parseCareDateTime(eTrim) : null;
+    if (pEnd) {
+      const now = new Date();
+      const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const eZero = new Date(pEnd.getFullYear(), pEnd.getMonth(), pEnd.getDate());
+      const hasSpecificTime = eTrim.includes(':');
+      if (eZero < todayZero || (eZero.getTime() === todayZero.getTime() && hasSpecificTime && now >= pEnd)) {
+        return '완료';
+      }
+    }
+  }
+
+  // [수동 설정값 반영]: 간병일정이 종료되지 않은 진행중/대기 건에 한해 수동 설정값 유지
+  if (app.hasManualUpdate && app.status) {
+    return app.status;
+  }
+
+  if (!specificAssigns && app._renderCareStatus) {
+    return app._renderCareStatus;
   }
 
   const isRawCompleted = rawSt === '완료' || rawSt === '정산완료' || rawSt.includes('완료') || rawSt.includes('종료') || rawSt.includes('종결');
@@ -5559,12 +5585,18 @@ function reconcileAppsWithActiveAssignments(targetApps = null, targetAssigns = n
 
     const isAlreadyCompleted = String(app.status || app.rawStatus || '').includes('완료') || String(app.status || app.rawStatus || '').includes('종료');
     const realStatus = (typeof determineRealCareStatus === 'function') ? determineRealCareStatus(app, appAssigns) : null;
-    if (realStatus && app.status !== realStatus && !app.hasManualUpdate) {
-      if (isAlreadyCompleted && realStatus === '진행중') {
-        // 이미 완료된 건은 진행중으로 뒤집지 않음
-      } else {
-        app.status = realStatus;
+    if (realStatus && app.status !== realStatus) {
+      // [사용자 요구사항]: 간병일정이 끝나면 자동으로 '완료'로 변경 (수동 플래그와 무관하게 일정이 끝나면 완료 반영)
+      if (realStatus === '완료') {
+        app.status = '완료';
         updatedAny = true;
+      } else if (!app.hasManualUpdate) {
+        if (isAlreadyCompleted && realStatus === '진행중') {
+          // 이미 완료된 건은 진행중으로 뒤집지 않음
+        } else {
+          app.status = realStatus;
+          updatedAny = true;
+        }
       }
     }
   });
@@ -7177,6 +7209,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
 
   const cardTheme = getCustomerCardStatusTheme(app, appAssigns);
   const currentStatus = determineRealCareStatus(app, appAssigns);
+  // [간병일정 종료 시 자동 완료 전환]: 일정이 종료된 건은 app.status도 자동으로 '완료'로 갱신 및 Convex 동기화
+  if (currentStatus === '완료' && app.status !== '완료' && !['취소', '서비스 취소', '당일서비스취소', '서비스불가 안내', '제외', '미해당'].includes(app.status)) {
+    app.status = '완료';
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveApplication', { app: { id: app.id, status: '완료' } }).catch(() => {});
+    }
+  }
   const isOngoingCare = (currentStatus === '진행중');
   const claimVal = String(app.claimClassification || app.claimCategory || '').trim();
   const claimStatus = checkCustomerClaimSetStatus(app, appAssigns);
@@ -8946,6 +8985,13 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
   const cardTheme = getCustomerCardStatusTheme(app, appAssigns);
   const currentStatus = determineRealCareStatus(app, appAssigns);
+  // [간병일정 종료 시 자동 완료 전환]: 일정이 종료된 건은 app.status도 자동으로 '완료'로 갱신 및 Convex 동기화
+  if (currentStatus === '완료' && app.status !== '완료' && !['취소', '서비스 취소', '당일서비스취소', '서비스불가 안내', '제외', '미해당'].includes(app.status)) {
+    app.status = '완료';
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveApplication', { app: { id: app.id, status: '완료' } }).catch(() => {});
+    }
+  }
   const claimVal = String(app.claimClassification || app.claimCategory || '').trim();
   const claimStatus = checkCustomerClaimSetStatus(app, appAssigns);
   const isPeekMode = Boolean(gClaimSetPeekMode[app.id]);
