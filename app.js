@@ -31779,12 +31779,34 @@ function calculateAndSetEndDate() {
 
   if (!endDateInput) return;
 
-  // 사용기간이 미정이거나 퇴원시까지, 장기예상 등 불특정 기간인 경우 종료예정일 값 비우기
-  if (!startDateStr || !expectedDaysStr || expectedDaysStr.includes('미정') || expectedDaysStr.includes('퇴원') || expectedDaysStr.includes('장기')) {
+  if (!expectedDaysStr || expectedDaysStr.includes('미정') || expectedDaysStr.includes('퇴원') || expectedDaysStr.includes('장기')) {
     endDateInput.value = '';
     if (endDatePicker) endDatePicker.value = '';
     return;
   }
+
+  // ⚡ [날짜 직접 입력 파싱]: 사용자가 예상기간 입력칸에 날짜를 입력한 경우
+  const fullDateMatch = expectedDaysStr.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+  const shortDateMatch = expectedDaysStr.match(/^(\d{1,2})[./-](\d{1,2})$/) || expectedDaysStr.match(/^(\d{1,2})월\s*(\d{1,2})일?$/);
+  if (fullDateMatch) {
+    const y = fullDateMatch[1];
+    const m = String(fullDateMatch[2]).padStart(2, '0');
+    const d = String(fullDateMatch[3]).padStart(2, '0');
+    const formattedDate = `${y}-${m}-${d}`;
+    endDateInput.value = formattedDate;
+    if (endDatePicker) endDatePicker.value = formattedDate;
+    return;
+  } else if (shortDateMatch) {
+    const curYear = (startDateStr && startDateStr.length >= 4) ? startDateStr.slice(0, 4) : new Date().getFullYear();
+    const m = String(shortDateMatch[1]).padStart(2, '0');
+    const d = String(shortDateMatch[2]).padStart(2, '0');
+    const formattedDate = `${curYear}-${m}-${d}`;
+    endDateInput.value = formattedDate;
+    if (endDatePicker) endDatePicker.value = formattedDate;
+    return;
+  }
+
+  if (!startDateStr) return;
 
   let days = 0;
   if (expectedDaysStr.includes('주')) {
@@ -31822,7 +31844,6 @@ function calculateAndSetEndDate() {
     }
   }
 
-  // 일수 계산이 불가한 경우에도 값 초기화
   endDateInput.value = '';
   if (endDatePicker) endDatePicker.value = '';
 }
@@ -33375,11 +33396,34 @@ function calculateAndSetEndDateCustEdit() {
 
   if (!endDateInput) return;
 
-  if (!startDateStr || !expectedDaysStr || expectedDaysStr.includes('미정') || expectedDaysStr.includes('퇴원') || expectedDaysStr.includes('장기')) {
+  if (!expectedDaysStr || expectedDaysStr.includes('미정') || expectedDaysStr.includes('퇴원') || expectedDaysStr.includes('장기')) {
     endDateInput.value = '';
     if (endDatePicker) endDatePicker.value = '';
     return;
   }
+
+  // ⚡ [날짜 직접 입력 파싱]: 사용자가 예상기간 입력칸에 날짜(예: 2026-11-27, 11-27, 11.27, 11/27, 11월 27일 등)를 입력한 경우
+  const fullDateMatch = expectedDaysStr.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+  const shortDateMatch = expectedDaysStr.match(/^(\d{1,2})[./-](\d{1,2})$/) || expectedDaysStr.match(/^(\d{1,2})월\s*(\d{1,2})일?$/);
+  if (fullDateMatch) {
+    const y = fullDateMatch[1];
+    const m = String(fullDateMatch[2]).padStart(2, '0');
+    const d = String(fullDateMatch[3]).padStart(2, '0');
+    const formattedDate = `${y}-${m}-${d}`;
+    endDateInput.value = formattedDate;
+    if (endDatePicker) endDatePicker.value = formattedDate;
+    return;
+  } else if (shortDateMatch) {
+    const curYear = (startDateStr && startDateStr.length >= 4) ? startDateStr.slice(0, 4) : new Date().getFullYear();
+    const m = String(shortDateMatch[1]).padStart(2, '0');
+    const d = String(shortDateMatch[2]).padStart(2, '0');
+    const formattedDate = `${curYear}-${m}-${d}`;
+    endDateInput.value = formattedDate;
+    if (endDatePicker) endDatePicker.value = formattedDate;
+    return;
+  }
+
+  if (!startDateStr) return;
 
   let days = 0;
   if (expectedDaysStr.includes('주')) {
@@ -33396,7 +33440,7 @@ function calculateAndSetEndDateCustEdit() {
   if (days <= 0) return;
 
   try {
-    const cleanStart = startDateStr.replace(/\./g, '-');
+    const cleanStart = startDateStr.split(/\s+/)[0].replace(/\./g, '-');
     const startObj = new Date(cleanStart);
     if (!isNaN(startObj.getTime())) {
       startObj.setDate(startObj.getDate() + (days - 1));
@@ -33761,11 +33805,50 @@ function openCustomerEditModal(appId, focusSection = null) {
   }
 
   // 간병종료 예정일
-  const endVal = app.careEndDate || '';
+  let endVal = app.careEndDate || '';
   const endInput = document.getElementById('custEditEndDate');
   const endPicker = document.getElementById('custEditEndDate_picker');
+
+  // ⚡ [저장된 고객 수정 팝업 진입 시 종료예정일 지능형 자동 보정]:
+  // 시작일과 예상기간(예: 30일)이 등록되어 있는데, 기존에 저장된 endVal이 비어있거나 당일/1일 뒤(예: 10.30 09:00)로 축소되어 있다면
+  // 예상기간(30일)에 맞는 올바른 간병종료 예정일로 자동 계산하여 프리필!
+  const rawStartDate = app.desiredDate || app.careStartDate || app.applyDate;
+  if (rawStartDate && expectedVal && !['미정', '퇴원', '퇴원시', '퇴원시까지', '장기'].some(kw => expectedVal.includes(kw))) {
+    const cleanStartStr = String(rawStartDate).split(/\s+/)[0].replace(/\./g, '-');
+    const pStart = new Date(cleanStartStr);
+    const pEnd = endVal ? new Date(String(endVal).split(/\s+/)[0].replace(/\./g, '-')) : null;
+
+    const diffDays = (pStart && pEnd && !isNaN(pStart.getTime()) && !isNaN(pEnd.getTime()))
+      ? Math.round((pEnd - pStart) / (1000 * 60 * 60 * 24)) + 1
+      : 0;
+
+    let targetDays = 0;
+    if (expectedVal.includes('주')) {
+      const m = expectedVal.match(/(\d+)\s*주/);
+      if (m) targetDays = parseInt(m[1], 10) * 7;
+    } else if (expectedVal.includes('개월') || expectedVal.includes('달')) {
+      const m = expectedVal.match(/(\d+)\s*(개월|달)/);
+      if (m) targetDays = parseInt(m[1], 10) * 30;
+    } else {
+      const m = expectedDaysStr = expectedVal.match(/(\d+)/);
+      if (m) targetDays = parseInt(m[1], 10);
+    }
+
+    // 종료일이 없거나, 예상기간은 3일 이상인데 저장된 종료일 간격이 1일 이하인 왜곡 데이터인 경우 자동 재계산 반영
+    if (!endVal || (targetDays >= 3 && diffDays <= 1)) {
+      if (pStart && !isNaN(pStart.getTime()) && targetDays > 0) {
+        const calcObj = new Date(pStart.getTime());
+        calcObj.setDate(calcObj.getDate() + (targetDays - 1));
+        const y = calcObj.getFullYear();
+        const m = String(calcObj.getMonth() + 1).padStart(2, '0');
+        const d = String(calcObj.getDate()).padStart(2, '0');
+        endVal = `${y}-${m}-${d}`;
+      }
+    }
+  }
+
   if (endInput) endInput.value = endVal;
-  if (endPicker && endVal) endPicker.value = endVal.replace(/\./g, '-');
+  if (endPicker && endVal) endPicker.value = String(endVal).split(/\s+/)[0].replace(/\./g, '-');
 
   // 비고 메모
   document.getElementById('custEditMemo').value = app.memo || '';

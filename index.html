@@ -9400,12 +9400,12 @@
                 <button type="button" onclick="setExpectedDaysValue('미정')" class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] shrink-0">미정</button>
                 <button type="button" onclick="setExpectedDaysValue('퇴원시까지')" class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] shrink-0">퇴원시</button>
               </div>
-              <input type="text" id="newAppExpectedDays" oninput="calculateAndSetEndDate()" placeholder="예: 30일, 퇴원시까지" class="w-full p-2.5 border rounded-xl font-bold text-slate-800">
+              <input type="text" id="newAppExpectedDays" oninput="calculateAndSetEndDate()" onchange="calculateAndSetEndDate()" onkeyup="calculateAndSetEndDate()" placeholder="예: 30일, 퇴원시까지" class="w-full p-2.5 border rounded-xl font-bold text-slate-800">
             </div>
             <div>
               <label onclick="triggerDatePicker('newAppEndDate_picker')" class="block font-bold text-slate-700 mb-1 flex items-center justify-between cursor-pointer select-none" title="클릭 시 달력 열기">
                 <span>간병종료 예정일</span>
-                <span class="text-[10px] text-blue-700 font-bold bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded-md">자동 계산</span>
+                <button type="button" onclick="calculateAndSetEndDate()" class="text-[10px] text-blue-700 hover:bg-blue-100 font-bold bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md cursor-pointer transition-all shadow-2xs" title="시작일과 예상기간으로 종료예정일 자동 계산">자동 계산 ⚡</button>
               </label>
               <div class="relative flex items-center">
                 <input type="text" id="newAppEndDate" placeholder="YYYY-MM-DD" class="w-full p-2.5 pr-10 border rounded-xl font-semibold bg-white cursor-pointer" onclick="triggerDatePicker('newAppEndDate_picker')" oninput="onEndDateManualChange()">
@@ -11601,7 +11601,7 @@
                 <button type="button" onclick="setCustEditExpectedDaysValue('미정')" class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] shrink-0 cursor-pointer">미정</button>
                 <button type="button" onclick="setCustEditExpectedDaysValue('퇴원시까지')" class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] shrink-0 cursor-pointer">퇴원시</button>
               </div>
-              <input type="text" id="custEditExpectedDays" oninput="calculateAndSetEndDateCustEdit()" placeholder="예: 30일, 퇴원시까지" class="w-full p-2.5 border rounded-xl font-bold text-slate-800 bg-white focus:ring-2 focus:ring-primary-500">
+              <input type="text" id="custEditExpectedDays" oninput="calculateAndSetEndDateCustEdit()" onchange="calculateAndSetEndDateCustEdit()" onkeyup="calculateAndSetEndDateCustEdit()" placeholder="예: 30일, 퇴원시까지" class="w-full p-2.5 border rounded-xl font-bold text-slate-800 bg-white focus:ring-2 focus:ring-primary-500">
             </div>
 
             <div>
@@ -16312,8 +16312,8 @@
   <script src="slack-report-client.js?v=20261006_1510"></script>
   <script src="./xlsx-populate.min.js"></script>
   <script src="care-report-2page-pdf.js?v=20261015_1755"></script>
-  <script src="app.js?v=20261102_1445"></script>
-  <script src="carehub.js?v=20261102_1445"></script>
+  <script src="app.js?v=20261102_1450"></script>
+  <script src="carehub.js?v=20261102_1450"></script>
   <script src="carehub-convex-client.js?v=20261023_subscription"></script>
   <script src="hyundaiclaimhub.js?v=20261016_split"></script>
   <script src="samsungclaimhub.js?v=20261019_sync"></script>

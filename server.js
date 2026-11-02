@@ -1553,12 +1553,14 @@ function appendServerAuditLog(logItem) {
             return false;
           });
           if (idx !== -1) {
-            const { claim, payout, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, deleteAssignIds, deleteAssignId, ...appFields } = fields;
+            const { claim, payout, claims: customerClaims, payouts: customerPayouts, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, deleteAssignIds, deleteAssignId, ...appFields } = fields;
+            const nowIso = new Date().toISOString();
             stored.applications[idx] = {
               ...stored.applications[idx],
               ...appFields,
-              updatedAt: new Date().toISOString()
+              updatedAt: nowIso
             };
+            const updatedRecord = stored.applications[idx];
 
             const delClaimIdList = Array.isArray(deleteClaimIds) ? deleteClaimIds : (deleteClaimId ? [deleteClaimId] : []);
             if (delClaimIdList.length > 0) {
@@ -1578,62 +1580,78 @@ function appendServerAuditLog(logItem) {
               }
             }
 
-            if (claim && claim.id) {
+            if (Array.isArray(customerClaims)) {
+              const otherClaims = (stored.claims || []).filter(c => c && String(c.applyId) !== String(targetId));
+              stored.claims = [...customerClaims, ...otherClaims];
+            } else if (claim && claim.id) {
               stored.claims = stored.claims || [];
               const cIdx = stored.claims.findIndex(c => c.id === claim.id);
               if (cIdx !== -1) {
-                stored.claims[cIdx] = { ...stored.claims[cIdx], ...claim, updatedAt: new Date().toISOString() };
+                stored.claims[cIdx] = { ...stored.claims[cIdx], ...claim, updatedAt: nowIso };
               } else {
                 stored.claims.unshift(claim);
               }
             }
-            if (payout && payout.id) {
+
+            if (Array.isArray(customerPayouts)) {
+              const otherPayouts = (stored.payouts || []).filter(p => p && String(p.applyId) !== String(targetId));
+              stored.payouts = [...customerPayouts, ...otherPayouts];
+            } else if (payout && payout.id) {
               stored.payouts = stored.payouts || [];
               const pIdx = stored.payouts.findIndex(p => p.id === payout.id);
               if (pIdx !== -1) {
-                stored.payouts[pIdx] = { ...stored.payouts[pIdx], ...payout, updatedAt: new Date().toISOString() };
+                stored.payouts[pIdx] = { ...stored.payouts[pIdx], ...payout, updatedAt: nowIso };
               } else {
                 stored.payouts.unshift(payout);
               }
             }
-            stored.updatedAt = new Date().toISOString();
-            fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
-            try {
-              const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
-              fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(stored, null, 2) + ';\n', 'utf-8');
-            } catch (seedErr) {
-              console.warn('[Seed JS Sync Warn]', seedErr.message);
-            }
-            if (typeof invalidateRealDataCache === 'function') {
-              try { invalidateRealDataCache(); } catch (e) {}
-            }
-            syncConvexMutation('sync:saveApplication', { app: stored.applications[idx] }).catch(console.warn);
-            if (fields.claim && fields.claim.id) {
-              syncConvexMutation('sync:saveClaim', { claim: fields.claim }).catch(console.warn);
-            }
-            if (fields.payout && fields.payout.id) {
-              syncConvexMutation('sync:savePayout', { payout: fields.payout }).catch(console.warn);
-            }
+            stored.updatedAt = nowIso;
 
-            // 서버 측 감사 로그 자동 기록
-            const targetPatientName = stored.applications[idx].patientName || targetId;
-            const updatedFieldNames = Object.keys(appFields).slice(0, 5).join(', ');
-            appendServerAuditLog({
-              category: '고객상세',
-              actionType: 'UPDATE',
-              target: `고객 [${targetId}] (${targetPatientName})`,
-              summary: `[${targetPatientName} 님] 고객 필드 정보 실시간 갱신 및 저장 (${updatedFieldNames})`,
-              changes: Object.keys(appFields).reduce((acc, k) => {
-                acc[k] = { before: '-', after: typeof appFields[k] === 'object' ? JSON.stringify(appFields[k]) : String(appFields[k]) };
-                return acc;
-              }, {})
-            });
-
+            // 즉시 클라이언트 응답 반환 후 디스크/Convex/감사로그는 백그라운드 비동기 플러시 (응답속도 극대화)
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            return res.end(JSON.stringify({ success: true, updatedApp: stored.applications[idx] }));
+            res.end(JSON.stringify({ success: true, updatedApp: updatedRecord }));
+
+            setImmediate(() => {
+              try {
+                const jsonStr = JSON.stringify(stored, null, 2);
+                fs.writeFileSync(realDataFile, jsonStr, 'utf-8');
+                try {
+                  const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
+                  fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + jsonStr + ';\n', 'utf-8');
+                } catch (seedErr) {
+                  console.warn('[Seed JS Sync Warn]', seedErr.message);
+                }
+                if (typeof invalidateRealDataCache === 'function') {
+                  try { invalidateRealDataCache(); } catch (e) {}
+                }
+                syncConvexMutation('sync:saveApplication', { app: updatedRecord }).catch(console.warn);
+                if (fields.claim && fields.claim.id) {
+                  syncConvexMutation('sync:saveClaim', { claim: fields.claim }).catch(console.warn);
+                }
+                if (fields.payout && fields.payout.id) {
+                  syncConvexMutation('sync:savePayout', { payout: fields.payout }).catch(console.warn);
+                }
+
+                const targetPatientName = updatedRecord.patientName || targetId;
+                const updatedFieldNames = Object.keys(appFields).slice(0, 5).join(', ');
+                appendServerAuditLog({
+                  category: '고객상세',
+                  actionType: 'UPDATE',
+                  target: `고객 [${targetId}] (${targetPatientName})`,
+                  summary: `[${targetPatientName} 님] 고객 필드 정보 실시간 갱신 및 저장 (${updatedFieldNames})`,
+                  changes: Object.keys(appFields).reduce((acc, k) => {
+                    acc[k] = { before: '-', after: typeof appFields[k] === 'object' ? JSON.stringify(appFields[k]) : String(appFields[k]) };
+                    return acc;
+                  }, {})
+                });
+              } catch (bgErr) {
+                console.warn('[update-fields async flush warn]', bgErr.message);
+              }
+            });
+            return;
           } else {
             // 신규접수 건이거나 아직 hub_apps_real.json에 등록되지 않았던 고객의 경우 자동 추가하여 영구 저장 보장
-            const { claim, payout, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, deleteAssignIds, deleteAssignId, ...appFields } = fields;
+            const { claim, payout, claims: customerClaims, payouts: customerPayouts, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, deleteAssignIds, deleteAssignId, ...appFields } = fields;
             const newAppRecord = {
               id: targetId,
               ...appFields,
@@ -1641,20 +1659,29 @@ function appendServerAuditLog(logItem) {
             };
             stored.applications.unshift(newAppRecord);
             stored.updatedAt = new Date().toISOString();
-            fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
-            try {
-              const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
-              fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(stored, null, 2) + ';\n', 'utf-8');
-            } catch (seedErr) {
-              console.warn('[Seed JS Sync Warn]', seedErr.message);
-            }
-            if (typeof invalidateRealDataCache === 'function') {
-              try { invalidateRealDataCache(); } catch (e) {}
-            }
-            syncConvexMutation('sync:saveApplication', { app: newAppRecord }).catch(console.warn);
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            return res.end(JSON.stringify({ success: true, updatedApp: newAppRecord }));
+            res.end(JSON.stringify({ success: true, updatedApp: newAppRecord }));
+
+            setImmediate(() => {
+              try {
+                const jsonStr = JSON.stringify(stored, null, 2);
+                fs.writeFileSync(realDataFile, jsonStr, 'utf-8');
+                try {
+                  const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
+                  fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + jsonStr + ';\n', 'utf-8');
+                } catch (seedErr) {
+                  console.warn('[Seed JS Sync Warn]', seedErr.message);
+                }
+                if (typeof invalidateRealDataCache === 'function') {
+                  try { invalidateRealDataCache(); } catch (e) {}
+                }
+                syncConvexMutation('sync:saveApplication', { app: newAppRecord }).catch(console.warn);
+              } catch (bgErr) {
+                console.warn('[update-fields newApp async flush warn]', bgErr.message);
+              }
+            });
+            return;
           }
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });

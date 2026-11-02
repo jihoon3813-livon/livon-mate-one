@@ -47,7 +47,7 @@ async function syncToConvexCloud(targetUrl, pathStr, args) {
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-convex-url, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -66,89 +66,124 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ success: false, error: 'appId와 fields가 필요합니다.' });
     }
 
-    const filePath = getFilePath();
-    let stored = { applications: [], claims: [], payouts: [] };
-    if (fs.existsSync(filePath)) {
+    const {
+      claim,
+      payout,
+      claims: customerClaims,
+      payouts: customerPayouts,
+      deleteClaimIds,
+      deleteClaimId,
+      deletePayoutIds,
+      deletePayoutId,
+      deleteAssignIds,
+      deleteAssignId,
+      ...appFields
+    } = fields;
+
+    const nowIso = new Date().toISOString();
+    let updatedApp = {
+      id: targetId,
+      ...appFields,
+      updatedAt: nowIso
+    };
+
+    // Vercel Serverless(읽기전용 파일시스템)에서는 2MB JSON 파일 Read/Parse/Write 생략하여 응답속도 극대화
+    if (!process.env.VERCEL) {
       try {
-        stored = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      } catch (e) {}
-    }
-    stored.applications = stored.applications || [];
-
-    const idx = stored.applications.findIndex(a => {
-      if (a.id === targetId) return true;
-      if (targetId && targetId.startsWith('H') && a.id === targetId.replace(/^H/, 'C')) return true;
-      if (targetId && targetId.startsWith('C') && a.id === targetId.replace(/^C/, 'H')) return true;
-      if (a.patientId && a.patientId === targetId) return true;
-      if (fields.patientName && a.patientName === fields.patientName) return true;
-      return false;
-    });
-
-    let updatedApp = null;
-    if (idx !== -1) {
-      const { claim, payout, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, ...appFields } = fields;
-      stored.applications[idx] = {
-        ...stored.applications[idx],
-        ...appFields,
-        updatedAt: new Date().toISOString()
-      };
-      updatedApp = stored.applications[idx];
-
-      const delClaimIdList = Array.isArray(deleteClaimIds) ? deleteClaimIds : (deleteClaimId ? [deleteClaimId] : []);
-      if (delClaimIdList.length > 0) {
-        stored.claims = (stored.claims || []).filter(c => !delClaimIdList.includes(c.id));
-      }
-
-      const delPayoutIdList = Array.isArray(deletePayoutIds) ? deletePayoutIds : (deletePayoutId ? [deletePayoutId] : []);
-      if (delPayoutIdList.length > 0) {
-        stored.payouts = (stored.payouts || []).filter(p => !delPayoutIdList.includes(p.id));
-      }
-
-      if (claim && claim.id) {
-        stored.claims = stored.claims || [];
-        const cIdx = stored.claims.findIndex(c => c.id === claim.id);
-        if (cIdx !== -1) {
-          stored.claims[cIdx] = { ...stored.claims[cIdx], ...claim, updatedAt: new Date().toISOString() };
-        } else {
-          stored.claims.unshift(claim);
+        const filePath = getFilePath();
+        let stored = { applications: [], claims: [], payouts: [] };
+        if (fs.existsSync(filePath)) {
+          try {
+            stored = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          } catch (e) {}
         }
-      }
+        stored.applications = stored.applications || [];
 
-      if (payout && payout.id) {
-        stored.payouts = stored.payouts || [];
-        const pIdx = stored.payouts.findIndex(p => p.id === payout.id);
-        if (pIdx !== -1) {
-          stored.payouts[pIdx] = { ...stored.payouts[pIdx], ...payout, updatedAt: new Date().toISOString() };
+        const idx = stored.applications.findIndex(a => {
+          if (a.id === targetId) return true;
+          if (targetId && targetId.startsWith('H') && a.id === targetId.replace(/^H/, 'C')) return true;
+          if (targetId && targetId.startsWith('C') && a.id === targetId.replace(/^C/, 'H')) return true;
+          if (a.patientId && a.patientId === targetId) return true;
+          if (fields.patientName && a.patientName === fields.patientName) return true;
+          return false;
+        });
+
+        if (idx !== -1) {
+          stored.applications[idx] = {
+            ...stored.applications[idx],
+            ...appFields,
+            updatedAt: nowIso
+          };
+          updatedApp = stored.applications[idx];
         } else {
-          stored.payouts.unshift(payout);
+          stored.applications.unshift(updatedApp);
         }
-      }
 
-      stored.updatedAt = new Date().toISOString();
-      try {
-        fs.writeFileSync(filePath, JSON.stringify(stored, null, 2), 'utf8');
+        const delClaimIdList = Array.isArray(deleteClaimIds) ? deleteClaimIds : (deleteClaimId ? [deleteClaimId] : []);
+        if (delClaimIdList.length > 0) {
+          stored.claims = (stored.claims || []).filter(c => !delClaimIdList.includes(c.id));
+        }
+
+        const delPayoutIdList = Array.isArray(deletePayoutIds) ? deletePayoutIds : (deletePayoutId ? [deletePayoutId] : []);
+        if (delPayoutIdList.length > 0) {
+          stored.payouts = (stored.payouts || []).filter(p => !delPayoutIdList.includes(p.id));
+        }
+
+        if (Array.isArray(customerClaims)) {
+          const otherClaims = (stored.claims || []).filter(c => c && String(c.applyId) !== String(targetId));
+          stored.claims = [...customerClaims, ...otherClaims];
+        } else if (claim && claim.id) {
+          stored.claims = stored.claims || [];
+          const cIdx = stored.claims.findIndex(c => c.id === claim.id);
+          if (cIdx !== -1) {
+            stored.claims[cIdx] = { ...stored.claims[cIdx], ...claim, updatedAt: nowIso };
+          } else {
+            stored.claims.unshift(claim);
+          }
+        }
+
+        if (Array.isArray(customerPayouts)) {
+          const otherPayouts = (stored.payouts || []).filter(p => p && String(p.applyId) !== String(targetId));
+          stored.payouts = [...customerPayouts, ...otherPayouts];
+        } else if (payout && payout.id) {
+          stored.payouts = stored.payouts || [];
+          const pIdx = stored.payouts.findIndex(p => p.id === payout.id);
+          if (pIdx !== -1) {
+            stored.payouts[pIdx] = { ...stored.payouts[pIdx], ...payout, updatedAt: nowIso };
+          } else {
+            stored.payouts.unshift(payout);
+          }
+        }
+
+        stored.updatedAt = nowIso;
+        const jsonStr = JSON.stringify(stored, null, 2);
+        fs.promises.writeFile(filePath, jsonStr, 'utf8').catch(() => {});
         const realDataJsPath = path.join(path.dirname(filePath), 'hub_real_data.js');
         if (fs.existsSync(realDataJsPath)) {
-          fs.writeFileSync(realDataJsPath, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(stored, null, 2) + ';\n', 'utf8');
+          fs.promises.writeFile(realDataJsPath, 'window.REBORN_REAL_SEED_DATA = ' + jsonStr + ';\n', 'utf8').catch(() => {});
         }
       } catch (writeErr) {
-        // Vercel serverless read-only filesystem
+        // Ignore read-only filesystem errors
       }
     }
 
-    // Always sync to Convex Cloud DB (respecting dev vs prod environment)
+    // Always sync to Convex Cloud DB in parallel (respecting dev vs prod environment)
     const targetConvexUrl = resolveConvexUrl(req);
-    if (updatedApp) {
-      await syncToConvexCloud(targetConvexUrl, 'sync:saveApplication', { app: updatedApp });
+    const convexTasks = [];
+    if (updatedApp && Object.keys(appFields).length > 0) {
+      convexTasks.push(syncToConvexCloud(targetConvexUrl, 'sync:saveApplication', { app: updatedApp }));
     }
-    if (fields.claim && fields.claim.id) {
-      await syncToConvexCloud(targetConvexUrl, 'sync:saveClaim', { claim: fields.claim });
+    if (claim && claim.id) {
+      convexTasks.push(syncToConvexCloud(targetConvexUrl, 'sync:saveClaim', { claim }));
     }
-    if (fields.payout && fields.payout.id) {
-      await syncToConvexCloud(targetConvexUrl, 'sync:savePayout', { payout: fields.payout });
+    if (payout && payout.id) {
+      convexTasks.push(syncToConvexCloud(targetConvexUrl, 'sync:savePayout', { payout }));
+    }
+    if (convexTasks.length > 0) {
+      await Promise.allSettled(convexTasks);
     }
 
-    return res.status(200).json({ success: true, updatedApp: updatedApp || { id: targetId, ...fields }, targetConvexUrl });
+    return res.status(200).json({ success: true, updatedApp, targetConvexUrl });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
