@@ -476,13 +476,39 @@ class SurveyService {
   }
 
   deleteTarget(id, actor = 'ADMIN') {
-    const idx = this.data.targets.findIndex(t => t.id === id);
-    if (idx === -1) return { success: false, message: '대상을 찾을 수 없습니다.' };
+    const cleanId = String(id || '').trim();
+    const idx = this.data.targets.findIndex(t => t.id === cleanId || t.serviceId === cleanId);
+    let removed = null;
+    if (idx !== -1) {
+      removed = this.data.targets.splice(idx, 1)[0];
+    }
 
-    const removed = this.data.targets.splice(idx, 1)[0];
-    this.recordAudit(actor, 'DELETE_TARGET', 'surveyTargets', id, { removed }, '관리자 삭제');
+    // 연관된 설문 응답(responses)도 함께 영구 삭제
+    if (Array.isArray(this.data.responses)) {
+      const prevLen = this.data.responses.length;
+      this.data.responses = this.data.responses.filter(r => {
+        if (!r) return false;
+        const rId = String(r.id || '').trim();
+        const rTargetId = String(r.targetId || '').trim();
+        const rServiceId = String(r.serviceId || '').trim();
+        if (cleanId && (rId === cleanId || rTargetId === cleanId || rServiceId === cleanId)) return false;
+        if (removed) {
+          if (removed.id && (rTargetId === String(removed.id).trim() || rId === String(removed.id).trim())) return false;
+          if (removed.serviceId && (rServiceId === String(removed.serviceId).trim() || rTargetId === String(removed.serviceId).trim())) return false;
+          if (removed.responseId && rId === String(removed.responseId).trim()) return false;
+        }
+        return true;
+      });
+    }
+
+    if (!removed) {
+      // 타겟은 없었지만 responses에서 삭제되었는지 확인
+      return { success: true, id: cleanId, removed: null };
+    }
+
+    this.recordAudit(actor, 'DELETE_TARGET', 'surveyTargets', cleanId, { removed }, '관리자 삭제');
     this.saveData();
-    return { success: true, id, removed };
+    return { success: true, id: cleanId, removed };
   }
 
   reissueToken(id, reason = '관리자 재발급', actor = 'ADMIN') {

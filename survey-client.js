@@ -324,15 +324,71 @@ function toggleAllSurveyResponseChecks(masterCb) {
 }
 
 // 삭제된 고객 ID 영구 보존 헬퍼 (새로고침/재시딩 시 자동 부활 방지)
-function markSurveyDeletedId(serviceId, targetId) {
+function markSurveyDeletedId(...ids) {
   try {
     const raw = localStorage.getItem('LIVON_SURVEY_DELETED_IDS') || '[]';
     const list = JSON.parse(raw);
     const set = new Set(Array.isArray(list) ? list : []);
-    if (serviceId && serviceId !== '-' && !String(serviceId).startsWith('TMP-')) set.add(String(serviceId).trim());
-    if (targetId && targetId !== '-') set.add(String(targetId).trim());
+
+    ids.flat().forEach(rawId => {
+      if (!rawId || rawId === '-' || rawId === 'null' || rawId === 'undefined') return;
+      const id = String(rawId).trim();
+      if (!id || id === '-') return;
+      set.add(id);
+      // ST- 접두사 양방향 등록 (예: C0779 <-> ST-C0779)
+      if (id.startsWith('ST-')) {
+        const bare = id.replace(/^ST-/, '').trim();
+        if (bare) set.add(bare);
+      } else if (!id.startsWith('TMP-') && !id.startsWith('SR-')) {
+        set.add('ST-' + id);
+      }
+    });
+
     localStorage.setItem('LIVON_SURVEY_DELETED_IDS', JSON.stringify(Array.from(set)));
+  } catch (e) {
+    console.warn('[SurveyClient] markSurveyDeletedId error:', e);
+  }
+}
+
+// 삭제된 고객/응답 여부 통합 판정 헬퍼 (재조회/재동기화 시 부활 방어)
+function isSurveyDeleted(objOrId) {
+  if (!objOrId) return false;
+  try {
+    const raw = localStorage.getItem('LIVON_SURVEY_DELETED_IDS') || '[]';
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list) || list.length === 0) return false;
+    const deletedSet = new Set(list.map(x => String(x).trim()));
+
+    if (typeof objOrId === 'string' || typeof objOrId === 'number') {
+      const s = String(objOrId).trim();
+      if (!s || s === '-') return false;
+      if (deletedSet.has(s)) return true;
+      if (s.startsWith('ST-') && deletedSet.has(s.replace(/^ST-/, '').trim())) return true;
+      if (!s.startsWith('ST-') && deletedSet.has('ST-' + s)) return true;
+      return false;
+    }
+
+    if (typeof objOrId === 'object') {
+      const checkKeys = [
+        objOrId.id,
+        objOrId.targetId,
+        objOrId.serviceId,
+        objOrId.displayAppId,
+        objOrId.responseId,
+        objOrId._target ? objOrId._target.id : null,
+        objOrId._target ? objOrId._target.serviceId : null,
+        objOrId._app ? objOrId._app.id : null
+      ];
+      for (const k of checkKeys) {
+        if (!k || k === '-') continue;
+        const s = String(k).trim();
+        if (deletedSet.has(s)) return true;
+        if (s.startsWith('ST-') && deletedSet.has(s.replace(/^ST-/, '').trim())) return true;
+        if (!s.startsWith('ST-') && !s.startsWith('SR-') && deletedSet.has('ST-' + s)) return true;
+      }
+    }
   } catch (e) {}
+  return false;
 }
 
 // 결과 관리 리스트 내 고객 및 설문 응답 삭제 (단건)
@@ -362,13 +418,29 @@ async function deleteSurveyResponseCustomer(responseId, targetId) {
     return;
   }
 
+  // 삭제 대상과 연관된 모든 식별자(ID) 수집
+  const idsToDelete = new Set();
+  [responseId, targetId, actualTargetId, actualServiceId, appId,
+   matched && matched.id, matched && matched.targetId, matched && matched.serviceId, matched && matched.displayAppId,
+   target && target.id, target && target.serviceId, target && target.responseId,
+   resp && resp.id, resp && resp.targetId, resp && resp.serviceId, resp && resp.displayAppId
+  ].forEach(id => {
+    if (id && id !== '-' && id !== 'null' && id !== 'undefined') {
+      const clean = String(id).trim();
+      idsToDelete.add(clean);
+      if (clean.startsWith('ST-')) idsToDelete.add(clean.replace(/^ST-/, '').trim());
+      else if (!clean.startsWith('TMP-') && !clean.startsWith('SR-')) idsToDelete.add('ST-' + clean);
+    }
+  });
+
   // 1. 응답 목록(responses)에서 제거
   if (Array.isArray(gSurveyState.responses)) {
     gSurveyState.responses = gSurveyState.responses.filter(r => {
-      if (responseId && r.id === responseId) return false;
-      if (actualTargetId && (r.targetId === actualTargetId || r.id === actualTargetId)) return false;
-      if (actualServiceId && actualServiceId !== '-' && r.serviceId === actualServiceId) return false;
-      if (matched && (r.id === matched.id || r.targetId === matched.targetId)) return false;
+      if (isSurveyDeleted(r)) return false;
+      const rId = String(r.id || '').trim();
+      const rTargetId = String(r.targetId || '').trim();
+      const rServiceId = String(r.serviceId || '').trim();
+      if (idsToDelete.has(rId) || idsToDelete.has(rTargetId) || idsToDelete.has(rServiceId)) return false;
       return true;
     });
     try {
@@ -379,10 +451,11 @@ async function deleteSurveyResponseCustomer(responseId, targetId) {
   // 2. 대상자 목록(targets)에서 제거
   if (Array.isArray(gSurveyState.targets)) {
     gSurveyState.targets = gSurveyState.targets.filter(t => {
-      if (actualTargetId && (t.id === actualTargetId || t.serviceId === actualTargetId)) return false;
-      if (actualServiceId && actualServiceId !== '-' && (t.serviceId === actualServiceId || t.id === actualServiceId)) return false;
-      if (responseId && (t.responseId === responseId || t.id === responseId)) return false;
-      if (matched && ((matched.targetId && t.id === matched.targetId) || (matched.serviceId && t.serviceId === matched.serviceId))) return false;
+      if (isSurveyDeleted(t)) return false;
+      const tId = String(t.id || '').trim();
+      const tServiceId = String(t.serviceId || '').trim();
+      const tResponseId = String(t.responseId || '').trim();
+      if (idsToDelete.has(tId) || idsToDelete.has(tServiceId) || idsToDelete.has(tResponseId)) return false;
       return true;
     });
     try {
@@ -391,23 +464,32 @@ async function deleteSurveyResponseCustomer(responseId, targetId) {
   }
 
   // 3. 재시딩 방지 영구 보존
-  markSurveyDeletedId(actualServiceId, actualTargetId);
+  markSurveyDeletedId(Array.from(idsToDelete));
 
-  // 4. Convex Cloud DB에서 대상자 삭제
-  if (actualTargetId && typeof syncToConvex === 'function') {
-    syncToConvex('sync:deleteSurveyTarget', { id: actualTargetId }).catch(err => console.warn('[Convex Delete Error]', err));
+  // 4. Convex Cloud DB에서 대상자 삭제 (가능한 모든 ID 변형 시도)
+  if (typeof syncToConvex === 'function') {
+    const sentConvex = new Set();
+    idsToDelete.forEach(cid => {
+      const s = String(cid).trim();
+      if (!sentConvex.has(s) && !s.startsWith('SR-')) {
+        sentConvex.add(s);
+        syncToConvex('sync:deleteSurveyTarget', { id: s }).catch(err => console.warn('[Convex Delete Error]', err));
+      }
+    });
   }
 
   // 5. 로컬 Node 백엔드에서 삭제
-  if (actualTargetId) {
-    try {
-      fetch('/api/survey/targets/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: actualTargetId, actor: 'ADMIN' })
-      }).catch(() => {});
-    } catch (e) {}
-  }
+  idsToDelete.forEach(nid => {
+    if (nid && !nid.startsWith('SR-')) {
+      try {
+        fetch('/api/survey/targets/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: nid, actor: 'ADMIN' })
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  });
 
   // 6. 통계 재계산
   const activeTargets = (gSurveyState.targets || []).filter(t => t.targetStatus !== 'CANCELLED');
@@ -419,12 +501,9 @@ async function deleteSurveyResponseCustomer(responseId, targetId) {
 
   // 7. 화면 및 배지 갱신
   renderSurveyResponses();
-  renderSurveyResponses();
   applySurveyFilters();
   renderSurveyKpis();
   updateSidebarSurveyBadge();
-  updateSurveyChipCounts();
-  if (typeof lucide !== 'undefined') lucide.createIcons();
   updateSurveyChipCounts();
   if (typeof lucide !== 'undefined') lucide.createIcons();
 
@@ -450,6 +529,7 @@ async function batchDeleteSelectedSurveyResponses() {
 
   let deletedCount = 0;
   const allCompleted = typeof getAllCompletedResponses === 'function' ? getAllCompletedResponses() : [];
+  const allIdsToDelete = new Set();
 
   checkboxes.forEach(cb => {
     const targetId = cb.getAttribute('data-target-id');
@@ -470,49 +550,80 @@ async function batchDeleteSelectedSurveyResponses() {
 
     const actualTargetId = target ? target.id : (targetId || (matched && matched.targetId));
     const actualServiceId = (target && target.serviceId) || (matched && matched.serviceId) || (resp && resp.serviceId);
+    const appId = (matched && (matched.displayAppId || matched.serviceId)) || (target && (target.serviceId || target.id)) || (resp && (resp.displayAppId || resp.serviceId)) || '-';
 
-    // 1) responses에서 제거
-    if (Array.isArray(gSurveyState.responses)) {
-      gSurveyState.responses = gSurveyState.responses.filter(r => {
-        if (responseId && r.id === responseId) return false;
-        if (actualTargetId && (r.targetId === actualTargetId || r.id === actualTargetId)) return false;
-        if (actualServiceId && actualServiceId !== '-' && r.serviceId === actualServiceId) return false;
-        if (matched && (r.id === matched.id || r.targetId === matched.targetId)) return false;
-        return true;
-      });
-    }
+    [responseId, targetId, actualTargetId, actualServiceId, appId,
+     matched && matched.id, matched && matched.targetId, matched && matched.serviceId, matched && matched.displayAppId,
+     target && target.id, target && target.serviceId, target && target.responseId,
+     resp && resp.id, resp && resp.targetId, resp && resp.serviceId, resp && resp.displayAppId
+    ].forEach(id => {
+      if (id && id !== '-' && id !== 'null' && id !== 'undefined') {
+        const clean = String(id).trim();
+        allIdsToDelete.add(clean);
+        if (clean.startsWith('ST-')) allIdsToDelete.add(clean.replace(/^ST-/, '').trim());
+        else if (!clean.startsWith('TMP-') && !clean.startsWith('SR-')) allIdsToDelete.add('ST-' + clean);
+      }
+    });
 
-    // 2) targets에서 제거
-    if (Array.isArray(gSurveyState.targets)) {
-      gSurveyState.targets = gSurveyState.targets.filter(t => {
-        if (actualTargetId && (t.id === actualTargetId || t.serviceId === actualTargetId)) return false;
-        if (actualServiceId && actualServiceId !== '-' && (t.serviceId === actualServiceId || t.id === actualServiceId)) return false;
-        if (responseId && (t.responseId === responseId || t.id === responseId)) return false;
-        if (matched && ((matched.targetId && t.id === matched.targetId) || (matched.serviceId && t.serviceId === matched.serviceId))) return false;
-        return true;
-      });
-    }
+    deletedCount++;
+  });
 
-    // 3) 재시딩 방지
-    markSurveyDeletedId(actualServiceId, actualTargetId);
+  // 1) responses에서 일괄 제거
+  if (Array.isArray(gSurveyState.responses)) {
+    gSurveyState.responses = gSurveyState.responses.filter(r => {
+      if (isSurveyDeleted(r)) return false;
+      const rId = String(r.id || '').trim();
+      const rTargetId = String(r.targetId || '').trim();
+      const rServiceId = String(r.serviceId || '').trim();
+      if (allIdsToDelete.has(rId) || allIdsToDelete.has(rTargetId) || allIdsToDelete.has(rServiceId)) return false;
+      return true;
+    });
+    try {
+      localStorage.setItem('LIVON_SURVEY_RESPONSES', JSON.stringify(gSurveyState.responses));
+    } catch (e) {}
+  }
 
-    // 4) Convex 삭제
-    if (actualTargetId && typeof syncToConvex === 'function') {
-      syncToConvex('sync:deleteSurveyTarget', { id: actualTargetId }).catch(() => {});
-    }
+  // 2) targets에서 일괄 제거
+  if (Array.isArray(gSurveyState.targets)) {
+    gSurveyState.targets = gSurveyState.targets.filter(t => {
+      if (isSurveyDeleted(t)) return false;
+      const tId = String(t.id || '').trim();
+      const tServiceId = String(t.serviceId || '').trim();
+      const tResponseId = String(t.responseId || '').trim();
+      if (allIdsToDelete.has(tId) || allIdsToDelete.has(tServiceId) || allIdsToDelete.has(tResponseId)) return false;
+      return true;
+    });
+    try {
+      localStorage.setItem('LIVON_SURVEY_TARGETS', JSON.stringify(gSurveyState.targets));
+    } catch (e) {}
+  }
 
-    // 5) 백엔드 삭제
-    if (actualTargetId) {
+  // 3) 재시딩 방지 영구 보존
+  markSurveyDeletedId(Array.from(allIdsToDelete));
+
+  // 4) Convex Cloud DB에서 삭제
+  if (typeof syncToConvex === 'function') {
+    const sentConvex = new Set();
+    allIdsToDelete.forEach(cid => {
+      const s = String(cid).trim();
+      if (!sentConvex.has(s) && !s.startsWith('SR-')) {
+        sentConvex.add(s);
+        syncToConvex('sync:deleteSurveyTarget', { id: s }).catch(() => {});
+      }
+    });
+  }
+
+  // 5) 백엔드 삭제
+  allIdsToDelete.forEach(nid => {
+    if (nid && !nid.startsWith('SR-')) {
       try {
         fetch('/api/survey/targets/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: actualTargetId, actor: 'ADMIN' })
+          body: JSON.stringify({ id: nid, actor: 'ADMIN' })
         }).catch(() => {});
       } catch (e) {}
     }
-
-    deletedCount++;
   });
 
   // 로컬 스토리지 보존
@@ -1047,8 +1158,10 @@ function getAllCompletedResponses() {
 
   // 1) gSurveyState.targets 중 SUBMITTED인 건
   (gSurveyState.targets || []).filter(t => t.responseStatus === 'SUBMITTED').forEach(t => {
+    if (isSurveyDeleted(t)) return;
     const matchedApp = findMatchedApplication(t, t);
     const cleanAppId = resolveResponseDisplayAppId(t, t);
+    if (isSurveyDeleted(cleanAppId)) return;
     const resolvedName = resolveResponsePatientName(t, t, matchedApp);
     const cleanHospital = (matchedApp && (matchedApp.hospitalName || matchedApp.addressDetail)) || t.hospitalName || '';
     const startD = (matchedApp && (matchedApp.serviceStartDate || matchedApp.careStartDate || matchedApp.startDate || matchedApp.applyDate)) || t.careStartDate || '';
@@ -1061,11 +1174,15 @@ function getAllCompletedResponses() {
       (t.serviceId && r.serviceId === t.serviceId) ||
       (t.token && r.token && t.token === r.token)
     );
+    if (matchedResp && isSurveyDeleted(matchedResp)) return;
+
     const effAnswers = (t.answers && Object.keys(t.answers).length > 0)
       ? t.answers
       : (matchedResp && matchedResp.answers && Object.keys(matchedResp.answers).length > 0 ? matchedResp.answers : (t.answers || {}));
 
     const key = String(cleanAppId || t.serviceId || t.id);
+    if (isSurveyDeleted(key)) return;
+
     const item = {
       id: t.responseId || (matchedResp && matchedResp.id) || ('SR-' + t.id),
       targetId: t.id,
@@ -1092,13 +1209,16 @@ function getAllCompletedResponses() {
       _target: t,
       _app: matchedApp
     };
+    if (isSurveyDeleted(item)) return;
     item.avgRating = calculateSurveyAvgScore(item);
     respMap.set(key, item);
   });
 
   // 2) gSurveyState.responses
   (gSurveyState.responses || []).forEach(r => {
+    if (isSurveyDeleted(r)) return;
     const sId = String(r.serviceId || r.targetId || r.id);
+    if (isSurveyDeleted(sId)) return;
     const phoneDigits = String(r.couponPhone || r.patientPhone || r.callbackPhone || '').replace(/[^0-9]/g, '');
 
     // 정밀 대상자 매칭 (ID -> 토큰 -> 전화번호 -> 환자명)
@@ -1107,20 +1227,25 @@ function getAllCompletedResponses() {
       (t.token && r.token && t.token === r.token)
     );
 
+    if (matchedTarget && isSurveyDeleted(matchedTarget)) return;
+
     if (!matchedTarget && phoneDigits && phoneDigits.length >= 8) {
       matchedTarget = (gSurveyState.targets || []).find(t => {
         const tDigits = String(t.patientPhone || t.couponPhone || '').replace(/[^0-9]/g, '');
         return tDigits && tDigits.slice(-8) === phoneDigits.slice(-8);
       });
+      if (matchedTarget && isSurveyDeleted(matchedTarget)) return;
     }
 
     if (!matchedTarget && r.patientName && r.patientName.trim() !== '' && r.patientName.trim() !== '-' && r.patientName.trim() !== '고객') {
       matchedTarget = (gSurveyState.targets || []).find(t => t.patientName && t.patientName.trim() === r.patientName.trim());
+      if (matchedTarget && isSurveyDeleted(matchedTarget)) return;
     }
 
     // 전역 신청 데이터(gApps 등)에서 C0779 등 실시간 신청 건 정밀 탐색
     const matchedApp = findMatchedApplication(r, matchedTarget);
     const cleanAppId = resolveResponseDisplayAppId(r, matchedTarget);
+    if (isSurveyDeleted(cleanAppId)) return;
     const resolvedName = resolveResponsePatientName(r, matchedTarget, matchedApp);
 
     const cleanHospital = (matchedApp && (matchedApp.hospitalName || matchedApp.addressDetail || matchedApp.hospitalRoadAddress)) ||
@@ -1132,6 +1257,7 @@ function getAllCompletedResponses() {
     const carer = findCaregiverForApp(matchedApp, matchedTarget, r);
 
     const mapKey = String(cleanAppId || sId);
+    if (isSurveyDeleted(mapKey)) return;
 
     const existing = respMap.get(mapKey) || respMap.get(sId);
     if (!existing) {
@@ -1149,6 +1275,7 @@ function getAllCompletedResponses() {
         _target: matchedTarget || { id: r.targetId || cleanAppId, serviceId: cleanAppId, giftStatus: 'PENDING' },
         _app: matchedApp
       };
+      if (isSurveyDeleted(item)) return;
       item.avgRating = calculateSurveyAvgScore(item);
       respMap.set(mapKey, item);
     } else {
@@ -1176,7 +1303,7 @@ function getAllCompletedResponses() {
     }
   });
 
-  return Array.from(respMap.values());
+  return Array.from(respMap.values()).filter(item => !isSurveyDeleted(item));
 }
 
 
@@ -1580,13 +1707,15 @@ async function loadSurveyMgmtData(showToastAlert = false) {
     ]);
 
     if (summaryRes.data) gSurveyState.summary = summaryRes.data;
-    if (Array.isArray(responsesRes.items)) gSurveyState.responses = responsesRes.items;
+    if (Array.isArray(responsesRes.items)) {
+      gSurveyState.responses = responsesRes.items.filter(r => !isSurveyDeleted(r));
+    }
 
-    // [데이터 유실 방지 통합 병합]: Convex Cloud 원격 DB와 로컬 캐시/API 대상자를 안전하게 필드 병합 (serviceId 기준 중복 방어)
+    // [데이터 유실 방지 통합 병합]: Convex Cloud 원격 DB와 로컬 캐시/API 대상자를 안전하게 필드 병합 (serviceId 기준 중복 방어 및 삭제자 영구 배제)
     const targetMap = new Map();
     const serviceToIdMap = new Map();
     const mergeTargetIntoMap = (item) => {
-      if (!item || !item.id) return;
+      if (!item || !item.id || isSurveyDeleted(item)) return;
       let key = String(item.id);
       const srvId = item.serviceId ? String(item.serviceId).trim() : '';
       if (srvId && !srvId.startsWith('ST-')) {
@@ -1596,6 +1725,7 @@ async function loadSurveyMgmtData(showToastAlert = false) {
           serviceToIdMap.set(srvId, key);
         }
       }
+      if (isSurveyDeleted(key) || isSurveyDeleted(srvId)) return;
       const prev = targetMap.get(key) || {};
       const merged = { ...prev, ...item, id: key };
       // 쿠폰 수신 번호, 설문 응답(answers) 및 선물 발송 관리 정보는 비어있지 않은 최신 값을 보존
@@ -1632,7 +1762,7 @@ async function loadSurveyMgmtData(showToastAlert = false) {
     }
 
     // 데이터 정제 및 설문 응답(couponPhone, 선물상태) 보강
-    gSurveyState.targets = Array.from(targetMap.values()).map(t => {
+    gSurveyState.targets = Array.from(targetMap.values()).filter(t => !isSurveyDeleted(t)).map(t => {
       if (!t) return t;
       t.hospitalName = cleanSurveyHospitalName(t.hospitalName, t);
       t.careStartDate = formatSurveyDate(t.careStartDate);
@@ -1964,7 +2094,7 @@ async function syncCompletedTargetsFromHub(isSilent = false) {
     for (const app of allApps) {
       if (!app || !app.patientName) continue;
       const appId = String(app.id || '').trim();
-      if (!appId || existingIds.has(appId) || existingIds.has('ST-' + appId)) continue;
+      if (!appId || existingIds.has(appId) || existingIds.has('ST-' + appId) || isSurveyDeleted(appId) || isSurveyDeleted('ST-' + appId) || isSurveyDeleted(app)) continue;
 
       const st = String(app.status || '').trim();
       if (st === '취소' || st === '신청취소' || st === '접수취소') continue;
@@ -6071,7 +6201,7 @@ async function autoSeedSurveyTargets(options = {}) {
       const existingMap = new Map((gSurveyState.targets || []).map(t => [String(t.serviceId || t.id), t]));
       completedApps.forEach(app => {
         const appId = String(app.id || '');
-        if (!existingServiceIds.has(appId)) {
+        if (!existingServiceIds.has(appId) && !isSurveyDeleted(appId) && !isSurveyDeleted('ST-' + appId) && !isSurveyDeleted(app)) {
           existingServiceIds.add(appId);
           // 랜덤 난수 대신 고유 appId 기반 결정론적 ID를 생성하여 중복 방어
           const targetId = appId ? ('ST-' + appId) : ('ST-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900));
@@ -7168,14 +7298,34 @@ async function deleteSurveyTarget(targetId) {
   }
 
   // 1. 로컬 상태에서 즉시 제거
-  const idx = gSurveyState.targets.findIndex(t => t.id === target.id);
-  if (idx !== -1) {
-    gSurveyState.targets.splice(idx, 1);
-  }
+  const targetIdsToDelete = new Set();
+  [targetId, target.id, target.serviceId, target.responseId].forEach(id => {
+    if (id && id !== '-' && id !== 'null' && id !== 'undefined') {
+      const clean = String(id).trim();
+      targetIdsToDelete.add(clean);
+      if (clean.startsWith('ST-')) targetIdsToDelete.add(clean.replace(/^ST-/, '').trim());
+      else if (!clean.startsWith('TMP-') && !clean.startsWith('SR-')) targetIdsToDelete.add('ST-' + clean);
+    }
+  });
+
+  gSurveyState.targets = (gSurveyState.targets || []).filter(t => {
+    if (isSurveyDeleted(t)) return false;
+    const tId = String(t.id || '').trim();
+    const tServiceId = String(t.serviceId || '').trim();
+    if (targetIdsToDelete.has(tId) || targetIdsToDelete.has(tServiceId)) return false;
+    return true;
+  });
 
   // responses에서도 연관 응답 제거
   if (Array.isArray(gSurveyState.responses)) {
-    gSurveyState.responses = gSurveyState.responses.filter(r => r.targetId !== target.id && r.serviceId !== target.serviceId && r.id !== target.id);
+    gSurveyState.responses = gSurveyState.responses.filter(r => {
+      if (isSurveyDeleted(r)) return false;
+      const rId = String(r.id || '').trim();
+      const rTargetId = String(r.targetId || '').trim();
+      const rServiceId = String(r.serviceId || '').trim();
+      if (targetIdsToDelete.has(rId) || targetIdsToDelete.has(rTargetId) || targetIdsToDelete.has(rServiceId)) return false;
+      return true;
+    });
     try {
       localStorage.setItem('LIVON_SURVEY_RESPONSES', JSON.stringify(gSurveyState.responses));
     } catch (e) {}
@@ -7187,21 +7337,32 @@ async function deleteSurveyTarget(targetId) {
   } catch (e) {}
 
   // 2-1. 재시딩 방지 영구 보존
-  markSurveyDeletedId(target.serviceId, target.id);
+  markSurveyDeletedId(Array.from(targetIdsToDelete));
 
   // 3. Convex 클라우드 DB에서 삭제
   if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:deleteSurveyTarget', { id: target.id }).catch(err => console.warn('[Convex Delete Error]', err));
+    const sent = new Set();
+    targetIdsToDelete.forEach(tid => {
+      const s = String(tid).trim();
+      if (!sent.has(s) && !s.startsWith('SR-')) {
+        sent.add(s);
+        syncToConvex('sync:deleteSurveyTarget', { id: s }).catch(err => console.warn('[Convex Delete Error]', err));
+      }
+    });
   }
 
   // 4. 로컬 Node 백엔드에서 삭제
-  try {
-    fetch('/api/survey/targets/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: target.id, actor: 'ADMIN' })
-    }).catch(() => {});
-  } catch (e) {}
+  targetIdsToDelete.forEach(nid => {
+    if (nid && !nid.startsWith('SR-')) {
+      try {
+        fetch('/api/survey/targets/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: nid, actor: 'ADMIN' })
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  });
 
   // 5. KPI 재계산 및 뷰 갱신
   const activeTargets = gSurveyState.targets.filter(t => t.targetStatus !== 'CANCELLED');
