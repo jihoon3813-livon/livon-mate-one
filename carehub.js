@@ -1606,9 +1606,11 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
   const defaultInsPrice = typeof getDefaultClaimUnitPrice === 'function' ? getDefaultClaimUnitPrice(app.insuranceCompany) : 160000;
   const dailyClaimPrice = (app.customDailyClaimPrice && !isNaN(Number(app.customDailyClaimPrice)) && Number(app.customDailyClaimPrice) > 0)
     ? Number(app.customDailyClaimPrice)
+    : ((app.dailyClaimPrice && !isNaN(Number(app.dailyClaimPrice)) && Number(app.dailyClaimPrice) > 0)
+      ? Number(app.dailyClaimPrice)
     : ((appClaims && appClaims.length > 0 && (appClaims[0].unitPrice || appClaims[0].dailyWage)) 
         ? (appClaims[0].unitPrice || appClaims[0].dailyWage) 
-        : defaultInsPrice);
+        : defaultInsPrice));
   
   const cgDailyWage = as ? (as.dailyWage || 140000) : 140000;
 
@@ -2009,7 +2011,10 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         }
         const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
 
-        const fullClaimAmount = claimForRound ? (Number(claimForRound.claimAmount) || (claimDays * dailyClaimPrice)) : (claimDays * dailyClaimPrice);
+        const roundDailyClaimPrice = claimForRound && Number(claimForRound.unitPrice || claimForRound.dailyWage) > 0
+          ? Number(claimForRound.unitPrice || claimForRound.dailyWage)
+          : dailyClaimPrice;
+        const fullClaimAmount = claimForRound ? (Number(claimForRound.claimAmount) || (claimDays * roundDailyClaimPrice)) : (claimDays * dailyClaimPrice);
         const fullPayoutAmount = payoutForRound ? (Number(payoutForRound.payoutAmount) || (payoutDays * roundDailyWage)) : 0;
 
         let depositAmount = (claimForRound && claimForRound.depositAmount !== undefined && claimForRound.depositAmount !== null && claimForRound.depositAmount !== '')
@@ -2083,7 +2088,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           }
         }
 
-        const ongoingClaimAmount = (roundStage === 'ONGOING') ? Math.min(fullClaimAmount, ongoingElapsed * dailyClaimPrice) : fullClaimAmount;
+        const ongoingClaimAmount = (roundStage === 'ONGOING') ? Math.min(fullClaimAmount, ongoingElapsed * roundDailyClaimPrice) : fullClaimAmount;
         const ongoingPayoutAmount = (roundStage === 'ONGOING') ? Math.min(fullPayoutAmount, ongoingElapsed * roundDailyWage) : fullPayoutAmount;
 
         const roundEndStdDate = (roundEndDateStr ? roundEndDateStr.slice(0, 10).replace(/-/g, '.') : '') || claimStandardDate || (payoutStandardDate ? payoutStandardDate.slice(0, 10) : '');
@@ -2110,7 +2115,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           stage: roundStage,
           ongoingElapsed: ongoingElapsed,
           ongoingRemaining: ongoingRemaining,
-          dailyClaimPrice,
+          dailyClaimPrice: roundDailyClaimPrice,
           fullClaimAmount,
           depositAmount,
           ongoingClaimAmount: ongoingClaimAmount,
@@ -15006,6 +15011,14 @@ function applyHubCustomerDetailSnapshot(appId, detail) {
   const appIndex = (gApps || []).findIndex(item => item && String(item.id) === String(appId));
   if (appIndex < 0) return false;
 
+  const currentApp = gApps[appIndex];
+  const currentUpdatedAt = Date.parse(currentApp && currentApp.updatedAt || '');
+  const incomingUpdatedAt = Date.parse(detail.application.updatedAt || '');
+  if (Number.isFinite(currentUpdatedAt) && Number.isFinite(incomingUpdatedAt) && currentUpdatedAt > incomingUpdatedAt) {
+    console.info('[Care Hub Detail Refresh] 오래된 상세 응답을 무시했습니다.', appId);
+    return false;
+  }
+
   gApps[appIndex] = detail.application;
   const normalizeApplyId = value => String(value || '').trim().replace(/^H/, 'C');
   const hasApplyId = item => item && (
@@ -15477,5 +15490,92 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
     refreshHubCustomerDetailFromConvex(app.id, gHubModalInstanceId, targetSetIndex);
   }
 }
+
+// 고객별 청구 단가는 이후 생성하는 세트의 기본 단가로만 적용한다.
+// 기존 claims 단가와 청구금액은 수정하지 않도록 app.js의 공통 핸들러를 이 화면에서 대체한다.
+window.saveCustomerClaimPrice = async function saveCustomerClaimPriceForFutureSets() {
+  const applyId = document.getElementById('custPriceModalApplyId')?.value;
+  const inputEl = document.getElementById('custPriceModalInput');
+  const app = (gApps || []).find(a => String(a.id) === String(applyId));
+  if (!app || !inputEl) return;
+
+  const newPrice = parseInt(String(inputEl.value || '').replace(/[^0-9]/g, ''), 10);
+  if (!newPrice || !Number.isFinite(newPrice) || newPrice <= 0) {
+    alert('유효한 1일 청구 단가를 입력해주세요.');
+    return;
+  }
+
+  app.customDailyClaimPrice = newPrice;
+  app.dailyClaimPrice = newPrice;
+  app.updatedAt = new Date().toISOString();
+
+  if (typeof saveApplications === 'function') saveApplications();
+  if (typeof syncToConvex === 'function') {
+    Promise.resolve().then(() => syncToConvex('sync:saveApplication', { app })).catch(console.warn);
+  }
+
+  closeModal('customerClaimPriceModal');
+  if (String(gActiveHubModalAppId || '') === String(app.id) && typeof openHubCustomerDetailModal === 'function') {
+    openHubCustomerDetailModal(app.id);
+  }
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  if (typeof renderClaims === 'function') renderClaims();
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '청구 단가 개별 변경 완료',
+      message: `[${app.patientName}] 고객의 ${formatCurrency(newPrice)}원/일 단가가 이후 새 세트에 적용됩니다. 기존 청구 내역은 변경하지 않았습니다.`
+    });
+  } else {
+    alert(`[${app.patientName}] 고객의 새 세트부터 ${formatCurrency(newPrice)}원/일 단가를 적용합니다. 기존 청구 내역은 변경하지 않았습니다.`);
+  }
+};
+
+window.resetCustomerClaimPrice = async function resetCustomerClaimPriceForFutureSets(applyId) {
+  const app = (gApps || []).find(a => String(a.id) === String(applyId));
+  if (!app) return;
+
+  const defaultPrice = typeof getDefaultClaimUnitPrice === 'function'
+    ? getDefaultClaimUnitPrice(app.insuranceCompany)
+    : 160000;
+  const confirmed = await showCustomConfirm(
+    `[청구 단가 기본 복원]\n\n` +
+    `환자명: ${app.patientName} 님\n` +
+    `원수사: ${app.insuranceCompany}\n` +
+    `복원할 기본 약정단가: ${formatCurrency(defaultPrice)}원/일\n\n` +
+    `개별 지정 단가를 해제하고 이후 새 세트부터 기본 약정단가를 적용하시겠습니까? 기존 청구 내역은 변경되지 않습니다.`,
+    {
+      title: '기본 약정단가 복원 확인',
+      confirmText: '기본단가로 복원',
+      cancelText: '취소'
+    }
+  );
+  if (!confirmed) return;
+
+  delete app.customDailyClaimPrice;
+  app.dailyClaimPrice = defaultPrice;
+  app.updatedAt = new Date().toISOString();
+
+  if (typeof saveApplications === 'function') saveApplications();
+  if (typeof syncToConvex === 'function') {
+    Promise.resolve().then(() => syncToConvex('sync:saveApplication', { app })).catch(console.warn);
+  }
+
+  closeModal('customerClaimPriceModal');
+  if (String(gActiveHubModalAppId || '') === String(app.id) && typeof openHubCustomerDetailModal === 'function') {
+    openHubCustomerDetailModal(app.id);
+  }
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  if (typeof renderClaims === 'function') renderClaims();
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '기본 약정단가 복원 완료',
+      message: `[${app.patientName}] 고객의 기본 단가 ${formatCurrency(defaultPrice)}원/일이 이후 새 세트에 적용됩니다. 기존 청구 내역은 변경하지 않았습니다.`
+    });
+  }
+};
 
 

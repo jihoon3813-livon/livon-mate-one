@@ -1113,6 +1113,15 @@
           <span class="h-5 px-2 rounded-md bg-orange-950 text-orange-300 font-bold text-[10px] flex items-center justify-center border border-orange-800" id="sidebarHyundaiEndedCount">종료청구</span>
         </button>
 
+        <!-- 7-2-3. 현대해상 청구관리(NEW) (청구세트 엑셀 시트 뷰 & 자동 생성 시스템) -->
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="hyundaiclaimhubnew" onclick="handleLeftMenuClick('hyundaiclaimhubnew')">
+          <div class="flex items-center space-x-3">
+            <i data-lucide="table-properties" class="w-4 h-4 flex-shrink-0 text-amber-400"></i>
+            <span class="tracking-tight font-semibold">현대해상 청구관리(NEW)</span>
+          </div>
+          <span class="h-5 px-2 rounded-md bg-amber-950 text-amber-300 font-bold text-[10px] flex items-center justify-center border border-amber-800">청구세트</span>
+        </button>
+
         <!-- 7-3. 삼성화재 콜분석 (인바운드 문의 분석 및 주간보고 시스템) -->
         <!--  삼성화재 콜분석 비활성화
         <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsungcallreport" onclick="handleLeftMenuClick('samsungcallreport')">
@@ -3543,6 +3552,11 @@
             <!-- Dynamic history table rendered by app.js -->
           </div>
         </div>
+      </section>
+
+      <!-- ==================== TAB: HYUNDAI MARINE CLAIM HUB (NEW) (현대해상 청구관리 NEW & 청구세트 시트 뷰) ==================== -->
+      <section id="tab-hyundaiclaimhubnew" class="tab-content hidden space-y-4">
+        <!-- Dynamically rendered by renderHyundaiClaimHubNew() in hyundaiclaimhub-new.js -->
       </section>
 
       <!-- ==================== TAB: SAMSUNG FIRE CALL ANALYSIS REPORT (삼성화재 간병서비스 콜분석 보고서) ==================== -->
@@ -14899,6 +14913,10 @@
                 <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
                   <input type="checkbox" name="adminMenuCheck" value="hyundaiclaimhub" class="rounded text-indigo-600 focus:ring-indigo-500">
                   <span class="font-medium">현대해상 청구관리</span>
+                </label>
+                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
+                  <input type="checkbox" name="adminMenuCheck" value="hyundaiclaimhubnew" class="rounded text-indigo-600 focus:ring-indigo-500">
+                  <span class="font-medium">현대해상 청구관리(NEW)</span>
                 </label>
               </div>
             </div>

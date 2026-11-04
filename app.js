@@ -20252,6 +20252,7 @@ var APP_TAB_META = {
   samsungsla: { name: '삼성화재 SLA', icon: 'award', color: 'text-amber-500' },
   hyundaiclaimhub: { name: '현대해상 청구관리', icon: 'printer', color: 'text-orange-500' },
   // samsungcallreport: { name: '삼성화재 콜분석', icon: 'phone-forwarded', color: 'text-blue-500' }, // 메뉴 비활성화
+  hyundaiclaimhubnew: { name: '현대해상 청구관리(NEW)', icon: 'table-properties', color: 'text-amber-500' },
   totalcallanalysis: { name: '종합 콜분석', icon: 'phone-call', color: 'text-cyan-500' },
   forms: { name: '양식', icon: 'files', color: 'text-amber-500' },
   faxmgmt: { name: '팩스관리', icon: 'printer', color: 'text-purple-500' },
@@ -20586,6 +20587,13 @@ function refreshTabData(tabId, filterParam = null) {
         }
         break;
 
+      // 4-3. 현대해상 청구관리(NEW): 청구세트 시트 뷰 및 자동 생성 갱신
+      case 'hyundaiclaimhubnew':
+        if (typeof renderHyundaiClaimHubNew === 'function') {
+          trackJob(renderHyundaiClaimHubNew(filterParam));
+        }
+        break;
+
       // 5. 간병일지 (케어포트 & new): 케어포트 실시간 동기화
       // case 'carelogs': // 메뉴 비활성화
       case 'carelogs_new':
@@ -20871,6 +20879,11 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
   else if (tabId === 'hyundaiclaimhub') {
     if (typeof renderHyundaiClaimHub === 'function') {
       renderHyundaiClaimHub(filterParam);
+    }
+  }
+  else if (tabId === 'hyundaiclaimhubnew') {
+    if (typeof renderHyundaiClaimHubNew === 'function') {
+      renderHyundaiClaimHubNew(filterParam);
     }
   }
   else if (tabId === 'samsungcallreport') {
@@ -30457,6 +30470,7 @@ var ADMIN_MENU_NAME_MAP = {
   samsunglist: '삼성명단',
   samsungclaimhub: '삼성접수/청구',
   hyundaiclaimhub: '현대청구',
+  hyundaiclaimhubnew: '현대청구(NEW)',
   samsungcallreport: '삼성콜분석',
   totalcallanalysis: '종합콜분석',
   forms: '양식관리',
@@ -38107,7 +38121,7 @@ function handleAdminRolePresetChange(role) {
   if (role === 'SUPER_ADMIN') {
     checkboxes.forEach(cb => cb.checked = true);
   } else if (role === 'FINANCE_ADMIN') {
-    const targets = ['carehub', 'samsunglist', 'samsungclaimhub', 'hyundaiclaimhub', 'claims', 'payouts', 'forms', 'faxmgmt'];
+    const targets = ['carehub', 'samsunglist', 'samsungclaimhub', 'hyundaiclaimhub', 'hyundaiclaimhubnew', 'claims', 'payouts', 'forms', 'faxmgmt'];
     checkboxes.forEach(cb => cb.checked = targets.includes(cb.value));
   } else if (role === 'COUNSEL_ADMIN') {
     const targets = ['dashboard', 'carehub', 'carecalendar', 'carelogs', 'directory', 'samsungcallreport', 'totalcallanalysis', 'applications', 'assignments', 'forms', 'faxmgmt'];
