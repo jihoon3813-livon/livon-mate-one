@@ -164,6 +164,271 @@ async function saveSlackConfigToConvex(cfg, reqOrUrl = null) {
   }
 }
 
+let inMemoryHistory = null;
+
+// 슬랙 발송 이력 기본 객체 구조
+function getDefaultHistory() {
+  return {
+    dispatchedKeys: {}, // { '2026-11-04_21:00': { status: 'SUCCESS', sentAt: '...', ... } }
+    logs: [],           // 최근 50개 발송 이력 목록
+    lastDispatchedAt: null,
+    lastDispatchedKey: null,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+// 로컬 파일 또는 메모리에서 발송 이력 로드
+function getSlackHistory() {
+  if (inMemoryHistory) {
+    return inMemoryHistory;
+  }
+  const historyPath = resolveFilePath('slack_history.json');
+  if (fs.existsSync(historyPath)) {
+    try {
+      const raw = fs.readFileSync(historyPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        inMemoryHistory = {
+          ...getDefaultHistory(),
+          ...parsed,
+          dispatchedKeys: parsed.dispatchedKeys || {},
+          logs: Array.isArray(parsed.logs) ? parsed.logs : []
+        };
+        return inMemoryHistory;
+      }
+    } catch (_) {}
+  }
+  inMemoryHistory = getDefaultHistory();
+  return inMemoryHistory;
+}
+
+// 로컬 파일에 발송 이력 저장
+function saveSlackHistoryLocal(history) {
+  inMemoryHistory = history;
+  const historyPath = resolveFilePath('slack_history.json');
+  try {
+    fs.writeFileSync(historyPath, JSON.stringify(history, null, 2), 'utf8');
+    return true;
+  } catch (err) {
+    try {
+      const tmpPath = path.join('/tmp', 'slack_history.json');
+      fs.writeFileSync(tmpPath, JSON.stringify(history, null, 2), 'utf8');
+      return true;
+    } catch (tmpErr) {
+      console.warn('[Slack History Local Save Warning]', err.message, tmpErr.message);
+      return false;
+    }
+  }
+}
+
+// Convex DB에서 발송 이력 로드
+async function fetchSlackHistoryFromConvex(reqOrUrl = null) {
+  const convexUrl = resolveConvexUrl(reqOrUrl);
+  try {
+    const res = await fetch(`${convexUrl}/api/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: 'sync:getSystemSettings',
+        args: {}
+      })
+    });
+    const data = await res.json();
+    if (data && Array.isArray(data.value)) {
+      const found = data.value.find(s => s && s.key === 'LIVON_SLACK_REPORT_HISTORY');
+      if (found && found.value && typeof found.value === 'object') {
+        const merged = {
+          ...getDefaultHistory(),
+          ...found.value,
+          dispatchedKeys: found.value.dispatchedKeys || {},
+          logs: Array.isArray(found.value.logs) ? found.value.logs : []
+        };
+        saveSlackHistoryLocal(merged);
+        return merged;
+      }
+    }
+  } catch (err) {
+    console.warn('[Slack Report] Failed to fetch history from Convex:', err.message);
+  }
+  return getSlackHistory();
+}
+
+// Convex DB에 발송 이력 저장
+async function saveSlackHistoryToConvex(history, reqOrUrl = null) {
+  saveSlackHistoryLocal(history);
+  const convexUrl = resolveConvexUrl(reqOrUrl);
+  try {
+    const res = await fetch(`${convexUrl}/api/mutation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: 'sync:saveSystemSetting',
+        args: {
+          key: 'LIVON_SLACK_REPORT_HISTORY',
+          value: history
+        }
+      })
+    });
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.warn('[Slack Report] Failed to save history to Convex:', err.message);
+    return null;
+  }
+}
+
+/**
+ * 특정 일자/스케줄의 중복 발송 여부 확인
+ * @param {string} kstDate - 예: '2026-11-04'
+ * @param {string} scheduleTime - 예: '21:00'
+ * @param {*} reqOrUrl 
+ * @returns {Promise<{alreadySent: boolean, reason?: string, details?: any}>}
+ */
+async function checkAlreadyDispatched(kstDate, scheduleTime, reqOrUrl = null) {
+  const history = await fetchSlackHistoryFromConvex(reqOrUrl);
+  const dispatchKey = `${kstDate}_${scheduleTime}`;
+  const record = history && history.dispatchedKeys && history.dispatchedKeys[dispatchKey];
+
+  if (record) {
+    // 1. 이미 성공적으로 발송 완료된 경우
+    if (record.status === 'SUCCESS') {
+      return {
+        alreadySent: true,
+        reason: `Already sent at ${record.sentAt} (Trigger: ${record.triggerType || 'UNKNOWN'})`,
+        details: record
+      };
+    }
+
+    // 2. 다른 프로세스에 의해 발송 진행 중(SENDING)인 경우 (최근 3분 이내)
+    if (record.status === 'SENDING') {
+      const lockedTime = new Date(record.lockedAt || record.sentAt || 0).getTime();
+      const elapsedMs = Date.now() - lockedTime;
+      if (elapsedMs < 3 * 60 * 1000) { // 3분 락 유지
+        return {
+          alreadySent: true,
+          reason: `Dispatch currently in progress by another worker (started ${Math.round(elapsedMs / 1000)}s ago)`,
+          details: record
+        };
+      }
+    }
+  }
+
+  // 일일 1회 발송 스케줄인 경우, 같은 날짜(kstDate)에 다른 시간대로 이미 성공 발송되었는지 추가 안전 검사
+  // (스케줄 시간 문자열 오차 예: '21:00' vs '21:01' 등으로 인한 중복 발송 방지)
+  if (history && history.dispatchedKeys) {
+    const todaySuccessKeys = Object.keys(history.dispatchedKeys).filter(k => {
+      return k.startsWith(kstDate) && history.dispatchedKeys[k]?.status === 'SUCCESS';
+    });
+    if (todaySuccessKeys.length > 0) {
+      const firstSuccess = history.dispatchedKeys[todaySuccessKeys[0]];
+      // 같은 날 이미 성공 이력이 있으면 중복 방지
+      return {
+        alreadySent: true,
+        reason: `Daily report for ${kstDate} already delivered via key ${todaySuccessKeys[0]} at ${firstSuccess.sentAt}`,
+        details: firstSuccess
+      };
+    }
+  }
+
+  return { alreadySent: false };
+}
+
+/**
+ * 발송 직전 동시 실행 방지를 위한 락(Lock) 획득
+ */
+async function acquireDispatchLock(dispatchKey, meta = {}, reqOrUrl = null) {
+  const history = await fetchSlackHistoryFromConvex(reqOrUrl);
+  const existing = history.dispatchedKeys[dispatchKey];
+  if (existing && existing.status === 'SUCCESS') {
+    return false;
+  }
+  if (existing && existing.status === 'SENDING') {
+    const elapsed = Date.now() - new Date(existing.lockedAt || 0).getTime();
+    if (elapsed < 3 * 60 * 1000) {
+      return false;
+    }
+  }
+
+  const nowIso = new Date().toISOString();
+  history.dispatchedKeys[dispatchKey] = {
+    status: 'SENDING',
+    lockedAt: nowIso,
+    dispatchKey,
+    kstDate: meta.kstDate,
+    schedule: meta.schedule,
+    triggerType: meta.triggerType || 'SCHEDULED'
+  };
+  history.updatedAt = nowIso;
+
+  await saveSlackHistoryToConvex(history, reqOrUrl);
+  return true;
+}
+
+/**
+ * 발송 성공 이력 저장
+ */
+async function recordDispatchSuccess(dispatchKey, meta = {}, reqOrUrl = null) {
+  const history = await fetchSlackHistoryFromConvex(reqOrUrl);
+  const nowIso = new Date().toISOString();
+  const logItem = {
+    id: `SLACK_LOG_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    dispatchKey,
+    kstDate: meta.kstDate,
+    schedule: meta.schedule,
+    sentAt: nowIso,
+    status: 'SUCCESS',
+    triggerType: meta.triggerType || 'SCHEDULED',
+    customTitle: meta.customTitle || null,
+    totalApps: meta.stats?.totalApps || 0,
+    assignedCount: meta.stats?.assignedCount || 0,
+    unassignedCount: meta.stats?.unassignedCount || 0,
+    totalDeposit: meta.stats?.totalDeposit || 0,
+    totalUnpaid: meta.stats?.totalUnpaid || 0,
+    totalPayout: meta.stats?.totalPayout || 0
+  };
+
+  history.dispatchedKeys[dispatchKey] = {
+    status: 'SUCCESS',
+    sentAt: nowIso,
+    dispatchKey,
+    kstDate: meta.kstDate,
+    schedule: meta.schedule,
+    triggerType: meta.triggerType || 'SCHEDULED',
+    totalApps: logItem.totalApps
+  };
+
+  // 최근 50개 로그 보존
+  history.logs = [logItem, ...(history.logs || [])].slice(0, 50);
+  history.lastDispatchedAt = nowIso;
+  history.lastDispatchedKey = dispatchKey;
+  history.updatedAt = nowIso;
+
+  await saveSlackHistoryToConvex(history, reqOrUrl);
+
+  // config.lastSentAt 도 동기화
+  const config = getSlackConfig();
+  config.lastSentAt = nowIso;
+  saveSlackConfig(config);
+  saveSlackConfigToConvex(config, reqOrUrl).catch(() => {});
+
+  return logItem;
+}
+
+/**
+ * 발송 실패 이력 기록 및 락 해제
+ */
+async function recordDispatchFailure(dispatchKey, errorMessage, reqOrUrl = null) {
+  const history = await fetchSlackHistoryFromConvex(reqOrUrl);
+  const nowIso = new Date().toISOString();
+  if (history.dispatchedKeys[dispatchKey]) {
+    history.dispatchedKeys[dispatchKey].status = 'FAILED';
+    history.dispatchedKeys[dispatchKey].failedAt = nowIso;
+    history.dispatchedKeys[dispatchKey].error = errorMessage;
+  }
+  history.updatedAt = nowIso;
+  await saveSlackHistoryToConvex(history, reqOrUrl);
+}
+
 function saveSlackConfig(cfg) {
   inMemoryConfig = cfg;
   const configPath = resolveFilePath('slack_config.json');
@@ -369,53 +634,151 @@ function sendSlackNotification(messageText, overrideWebhookUrl = null) {
 }
 
 // 즉시 리포트 발송 (데이터 미전달 시 Convex Cloud 실시간 DB에서 자동 쿼리)
-async function sendDailyReport(customTitle = null, providedApps = null, overrideWebhookUrl = null, reqOrUrl = null) {
+// options: { scheduleTime, triggerType, skipDuplicateCheck }
+async function sendDailyReport(customTitle = null, providedApps = null, overrideWebhookUrl = null, reqOrUrl = null, options = {}) {
+  const {
+    scheduleTime = null,
+    triggerType = 'MANUAL',
+    skipDuplicateCheck = false
+  } = options || {};
+
+  const now = new Date();
+  const kstDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(now);
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(now);
+  const currentKstTime = `${parts.find(p => p.type === 'hour')?.value || '21'}:${parts.find(p => p.type === 'minute')?.value || '00'}`;
+  const effectiveSchedule = scheduleTime || currentKstTime;
+  const dispatchKey = `${kstDate}_${effectiveSchedule}`;
+
+  // 1. 중복 검사 (스케줄 자동 발송/크론 발송 시 DB 조회 및 검증)
+  if (!skipDuplicateCheck) {
+    const dupCheck = await checkAlreadyDispatched(kstDate, effectiveSchedule, reqOrUrl);
+    if (dupCheck.alreadySent) {
+      console.log(`[Slack Report] Duplicate dispatch prevented for ${dispatchKey}: ${dupCheck.reason}`);
+      return {
+        success: true,
+        skipped: true,
+        alreadyDispatched: true,
+        dispatchKey,
+        reason: dupCheck.reason,
+        details: dupCheck.details
+      };
+    }
+
+    // 2. 동시 실행 방지 락(Lock) 획득
+    const lockAcquired = await acquireDispatchLock(dispatchKey, { triggerType, kstDate, schedule: effectiveSchedule }, reqOrUrl);
+    if (!lockAcquired) {
+      console.log(`[Slack Report] Failed to acquire dispatch lock for ${dispatchKey} (already in progress or dispatched). Skipping.`);
+      return {
+        success: true,
+        skipped: true,
+        alreadyDispatched: true,
+        dispatchKey,
+        reason: `Dispatch lock could not be acquired for ${dispatchKey}. Another worker is processing.`
+      };
+    }
+  }
+
   let apps = providedApps;
   if (!Array.isArray(apps) || apps.length === 0) {
     apps = await fetchApplicationsFromConvex(reqOrUrl);
   }
   const stats = generateReportData(apps);
-  const text = buildSlackMessage(stats, customTitle);
-  return await sendSlackNotification(text, overrideWebhookUrl);
+  const title = customTitle || `*[메이트원 통합간병허브 일일 운영보고]* 📊 ${kstDate} ${effectiveSchedule}`;
+  const text = buildSlackMessage(stats, title);
+
+  try {
+    const sendResult = await sendSlackNotification(text, overrideWebhookUrl);
+
+    // 3. 발송 성공 이력을 DB 및 로컬에 영구 저장
+    const logItem = await recordDispatchSuccess(dispatchKey, {
+      triggerType,
+      kstDate,
+      schedule: effectiveSchedule,
+      customTitle: title,
+      stats
+    }, reqOrUrl);
+
+    return {
+      ...sendResult,
+      dispatchKey,
+      kstDate,
+      schedule: effectiveSchedule,
+      logItem
+    };
+  } catch (err) {
+    console.error(`[Slack Report] Dispatch failed for ${dispatchKey}:`, err.message);
+    if (!skipDuplicateCheck) {
+      await recordDispatchFailure(dispatchKey, err.message, reqOrUrl).catch(() => {});
+    }
+    throw err;
+  }
 }
 
 // 스케줄러 (매 30초마다 현재 한국 시간 검사)
+let schedulerInterval = null;
 let lastDispatchedMinute = '';
+
 function initSlackScheduler() {
-  console.log('[Slack Report Service] Scheduler initialized.');
+  if (schedulerInterval) {
+    console.log('[Slack Report Service] Scheduler interval already running. Skipping duplicate init.');
+    return;
+  }
 
-  setInterval(async () => {
-    const config = getSlackConfig();
-    if (!config.enabled || !Array.isArray(config.schedules) || config.schedules.length === 0) {
-      return;
-    }
+  console.log('[Slack Report Service] Scheduler initialized (30s interval).');
 
-    const now = new Date();
-    // Asia/Seoul 시간대 기준 HH:mm 및 YYYY-MM-DD 구하기
-    const parts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Asia/Seoul',
-      hour: '2-digit', minute: '2-digit', hour12: false
-    }).formatToParts(now);
-    const hh = parts.find(p => p.type === 'hour')?.value || '00';
-    const mm = parts.find(p => p.type === 'minute')?.value || '00';
-    const currentTime = `${hh}:${mm}`;
-
-    const kstDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(now);
-    const todayMinuteKey = `${kstDate}_${currentTime}`;
-
-    if (lastDispatchedMinute === todayMinuteKey) {
-      return;
-    }
-
-    if (config.schedules.includes(currentTime)) {
-      lastDispatchedMinute = todayMinuteKey;
-      console.log(`[Slack Report] Scheduled trigger time matched: ${currentTime}. Sending daily report...`);
-      try {
-        const res = await sendDailyReport(`*[메이트원 통합간병허브 일일 운영보고]* 📊 ${kstDate} ${currentTime}`);
-        console.log('[Slack Report] Scheduled report successfully delivered:', res);
-      } catch (err) {
-        console.error('[Slack Report] Scheduled report failed:', err.message);
+  schedulerInterval = setInterval(async () => {
+    try {
+      const config = getSlackConfig();
+      if (!config.enabled || !Array.isArray(config.schedules) || config.schedules.length === 0) {
+        return;
       }
+
+      const now = new Date();
+      // Asia/Seoul 시간대 기준 HH:mm 및 YYYY-MM-DD 구하기
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Seoul',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).formatToParts(now);
+      const hh = parts.find(p => p.type === 'hour')?.value || '00';
+      const mm = parts.find(p => p.type === 'minute')?.value || '00';
+      const currentTime = `${hh}:${mm}`;
+
+      const kstDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(now);
+      const todayMinuteKey = `${kstDate}_${currentTime}`;
+
+      if (lastDispatchedMinute === todayMinuteKey) {
+        return;
+      }
+
+      if (config.schedules.includes(currentTime)) {
+        lastDispatchedMinute = todayMinuteKey;
+
+        // DB 발송 이력 사전 확인 (Vercel Cron이나 다른 배포 인스턴스가 이미 발송했는지 검사)
+        const dupCheck = await checkAlreadyDispatched(kstDate, currentTime);
+        if (dupCheck.alreadySent) {
+          console.log(`[Slack Report Scheduler] ${todayMinuteKey} already sent elsewhere (${dupCheck.reason}). Skipping duplicate execution.`);
+          return;
+        }
+
+        console.log(`[Slack Report] Scheduled trigger time matched: ${currentTime}. Sending daily report...`);
+        const res = await sendDailyReport(
+          `*[메이트원 통합간병허브 일일 운영보고]* 📊 ${kstDate} ${currentTime}`,
+          null,
+          null,
+          null,
+          {
+            scheduleTime: currentTime,
+            triggerType: 'SCHEDULED',
+            skipDuplicateCheck: false
+          }
+        );
+        console.log('[Slack Report] Scheduled report execution result:', res);
+      }
+    } catch (loopErr) {
+      console.error('[Slack Report Scheduler Loop Error]', loopErr.message);
     }
   }, 30 * 1000); // 30초 간격 체크
 }
@@ -425,6 +788,15 @@ module.exports = {
   saveSlackConfig,
   fetchSlackConfigFromConvex,
   saveSlackConfigToConvex,
+  getDefaultHistory,
+  getSlackHistory,
+  saveSlackHistoryLocal,
+  fetchSlackHistoryFromConvex,
+  saveSlackHistoryToConvex,
+  checkAlreadyDispatched,
+  acquireDispatchLock,
+  recordDispatchSuccess,
+  recordDispatchFailure,
   fetchApplicationsFromConvex,
   resolveConvexUrl,
   generateReportData,

@@ -37,10 +37,11 @@ module.exports = async function handler(req, res) {
       ? config.schedules 
       : ['21:00'];
 
+    // 현재 KST 시(hour)에 해당하는 스케줄 특정
+    const matchedSchedule = schedules.find(s => s.trim().startsWith(hh)) || (isForce ? schedules[0] : null);
+
     if (!isForce) {
-      // 시간(시, hour) 일치 여부 확인 (예: 21:00 스케줄이면 21시 시간대에만 발송 허용)
-      const matched = schedules.some(s => s.trim().startsWith(hh));
-      if (!matched) {
+      if (!matchedSchedule) {
         return res.status(200).json({
           success: false,
           skipped: true,
@@ -48,10 +49,29 @@ module.exports = async function handler(req, res) {
           triggerTime: `${kstDate} ${hh}:${mm}`
         });
       }
+
+      // [핵심] DB 발송 이력 검사 (오늘 해당 스케줄로 이미 발송되었거나 진행 중인지 확인)
+      const dupCheck = await slackService.checkAlreadyDispatched(kstDate, matchedSchedule, req);
+      if (dupCheck.alreadySent) {
+        console.log(`[Slack Cron] Already dispatched for ${kstDate}_${matchedSchedule}: ${dupCheck.reason}. Skipping.`);
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          alreadyDispatched: true,
+          reason: dupCheck.reason,
+          details: dupCheck.details,
+          triggerTime: `${kstDate} ${hh}:${mm}`
+        });
+      }
     }
 
-    const customTitle = `*[메이트원 통합간병허브 일일 운영보고]* 📊 ${kstDate} ${hh}:${mm}`;
-    const result = await slackService.sendDailyReport(customTitle, null, null, req);
+    const scheduleToRecord = matchedSchedule || `${hh}:${mm}`;
+    const customTitle = `*[메이트원 통합간병허브 일일 운영보고]* 📊 ${kstDate} ${scheduleToRecord}`;
+    const result = await slackService.sendDailyReport(customTitle, null, null, req, {
+      scheduleTime: scheduleToRecord,
+      triggerType: isForce ? 'CRON_FORCED' : 'CRON',
+      skipDuplicateCheck: isForce
+    });
 
     return res.status(200).json({
       success: true,

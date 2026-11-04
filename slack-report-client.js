@@ -41,7 +41,12 @@
                 <i data-lucide="hash" class="w-4 h-4 text-purple-600"></i>
                 수신 채널: <b id="slackChannelNameDisplay" class="text-purple-700">#수행_2024_livon_careport_device-alert</b>
               </span>
-              <span id="slackLastSentText" class="text-[11px] text-slate-500 font-medium">최근 발송: 대기중</span>
+              <div class="flex items-center gap-2">
+                <span id="slackTodayStatusBadge" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold text-[10px]">
+                  오늘 발송 대기
+                </span>
+                <span id="slackLastSentText" class="text-[11px] text-slate-500 font-medium">최근 발송: 대기중</span>
+              </div>
             </div>
             <div class="text-[11px] text-slate-600 flex items-center justify-between gap-2 bg-white p-2.5 rounded-xl border border-purple-100 font-mono">
               <div class="flex items-center gap-1.5 min-w-0">
@@ -90,7 +95,27 @@
               </button>
             </div>
             <div class="relative">
-              <pre id="slackPreviewBox" class="bg-slate-900 text-slate-100 p-4 rounded-2xl font-mono text-[11px] leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto custom-scrollbar border border-slate-800 shadow-inner">집계 데이터를 불러오는 중입니다...</pre>
+              <pre id="slackPreviewBox" class="bg-slate-900 text-slate-100 p-4 rounded-2xl font-mono text-[11px] leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar border border-slate-800 shadow-inner">집계 데이터를 불러오는 중입니다...</pre>
+            </div>
+          </div>
+
+          <!-- 4. 최근 발송 이력 (DB 영구 저장 및 중복 방지) -->
+          <div class="space-y-2 pt-2 border-t border-slate-200">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                <i data-lucide="history" class="w-4 h-4 text-purple-600"></i>
+                발송 이력 및 중복 방지 현황 (DB 기록)
+              </span>
+              <button type="button" onclick="loadSlackHistory()" class="text-purple-600 hover:text-purple-800 text-[11px] font-bold flex items-center gap-1 cursor-pointer">
+                <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                이력 새로고침
+              </button>
+            </div>
+            <p class="text-[11px] text-slate-500">
+              * 매일 21:00 발송 완료 시 DB에 발송 이력이 영구 기록되어, 다중 스케줄러 환경에서도 <b>중복 발송이 원천 차단</b>됩니다.
+            </p>
+            <div id="slackHistoryContainer" class="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-44 overflow-y-auto custom-scrollbar">
+              <div class="text-center text-slate-400 py-3">발송 이력을 불러오는 중...</div>
             </div>
           </div>
 
@@ -135,7 +160,117 @@
       modal.classList.remove('hidden');
       if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
       await loadSlackConfig();
+      await loadSlackHistory();
       await loadSlackPreview();
+    }
+  };
+
+  window.loadSlackHistory = async function() {
+    const container = document.getElementById('slackHistoryContainer');
+    const badge = document.getElementById('slackTodayStatusBadge');
+    if (container) {
+      container.innerHTML = '<div class="text-center text-slate-400 py-3 text-xs">발송 이력 불러오는 중...</div>';
+    }
+
+    try {
+      let data = null;
+      try {
+        const convexUrl = window.CURRENT_CONVEX_URL || '';
+        const res = await fetch('/api/slack/history', {
+          headers: convexUrl ? { 'x-convex-url': convexUrl } : {}
+        });
+        if (res.ok) {
+          data = await res.json();
+        }
+      } catch (_) {}
+
+      // Fallback: Convex Cloud 직접 쿼리
+      if (!data || !data.success) {
+        if (typeof queryConvex === 'function') {
+          const cvxRes = await queryConvex('sync:getSystemSettings', {});
+          if (cvxRes && Array.isArray(cvxRes.value)) {
+            const found = cvxRes.value.find(s => s && s.key === 'LIVON_SLACK_REPORT_HISTORY');
+            if (found && found.value) {
+              const hist = found.value;
+              const now = new Date();
+              const kstDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(now);
+              const todaySuccessKeys = Object.keys(hist.dispatchedKeys || {}).filter(k => {
+                return k.startsWith(kstDate) && hist.dispatchedKeys[k]?.status === 'SUCCESS';
+              });
+              data = {
+                success: true,
+                history: hist,
+                todaySent: todaySuccessKeys.length > 0,
+                todaySentKeys: todaySuccessKeys,
+                todayDate: kstDate
+              };
+            }
+          }
+        }
+      }
+
+      if (!data || !data.history) {
+        if (container) {
+          container.innerHTML = '<div class="text-center text-slate-400 py-3 text-xs">발송 이력이 없습니다.</div>';
+        }
+        return;
+      }
+
+      // 오늘 발송 상태 뱃지 업데이트
+      if (badge) {
+        if (data.todaySent) {
+          badge.className = 'px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[10px] flex items-center gap-1';
+          badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 오늘 정기발송 완료';
+        } else {
+          badge.className = 'px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-bold text-[10px] flex items-center gap-1';
+          badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> 오늘 발송 대기중 (21:00)';
+        }
+      }
+
+      const logs = Array.isArray(data.history.logs) ? data.history.logs : [];
+      if (!container) return;
+
+      if (logs.length === 0) {
+        container.innerHTML = '<div class="text-center text-slate-400 py-3 text-xs">최근 저장된 발송 이력이 없습니다.</div>';
+        return;
+      }
+
+      const html = logs.slice(0, 15).map(log => {
+        const isSuccess = log.status === 'SUCCESS';
+        const dateStr = log.sentAt ? new Date(log.sentAt).toLocaleString('ko-KR', {
+          month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }) : (log.kstDate || '-');
+        const triggerLabel = log.triggerType === 'SCHEDULED' ? '정기 스케줄' : (log.triggerType === 'CRON' ? 'Vercel Cron' : (log.triggerType === 'MANUAL' ? '수동 발송' : log.triggerType));
+        const totalApps = typeof log.totalApps === 'number' ? `총 ${log.totalApps}건` : '';
+
+        return `
+          <div class="flex items-center justify-between py-2 px-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 text-[11px]">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-2 h-2 rounded-full ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'} shrink-0"></span>
+              <div class="min-w-0">
+                <div class="font-bold text-slate-800 truncate">${dateStr}</div>
+                <div class="text-[10px] text-slate-500 flex items-center gap-1.5">
+                  <span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-medium">${triggerLabel}</span>
+                  ${log.schedule ? `<span class="text-purple-600 font-semibold">${log.schedule}</span>` : ''}
+                  ${totalApps ? `<span class="text-slate-400">·</span><span class="text-slate-600">${totalApps}</span>` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="shrink-0 text-right">
+              <span class="font-bold ${isSuccess ? 'text-emerald-600' : 'text-rose-600'} text-[10px]">
+                ${isSuccess ? '발송 완료' : '발송 실패'}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = html;
+      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    } catch (e) {
+      if (container) {
+        container.innerHTML = `<div class="text-center text-rose-500 py-3 text-xs">이력 조회 오류: ${e.message}</div>`;
+      }
     }
   };
 
@@ -429,6 +564,7 @@
       if (data && data.success) {
         alert('🎉 [발송 성공]\n슬랙 채널로 일일 운영보고서가 즉시 전송되었습니다!');
         await loadSlackConfig();
+        await loadSlackHistory();
       } else {
         alert('발송 실패: ' + (data?.error || '응답 오류'));
       }
