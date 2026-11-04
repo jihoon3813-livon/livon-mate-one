@@ -953,12 +953,12 @@
           </button>
           ${gHyundaiNewSelectedClaimIds.size ? `<button type="button" onclick="window.clearHyundaiNewClaimSelection()"
             class="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer whitespace-nowrap">선택 해제</button>` : ''}
-          <!-- <button type="button" onclick="window.runHyundaiClaimSetAutoGeneration()" 
+           <button type="button" onclick="window.runHyundaiClaimSetAutoGeneration()" 
             class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-xs font-black inline-flex items-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
             title="10일, 20일, 말일 또는 간병종료일에 해당하는 신규 청구세트를 자동으로 검출하여 생성합니다">
             <i data-lucide="zap" class="w-4 h-4 text-amber-100"></i>
             <span>청구세트 자동 생성 실행</span>
-          </button> -->
+          </button> 
           <button type="button" onclick="window.exportHyundaiClaimSetsToExcel()" 
             class="px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs cursor-pointer whitespace-nowrap"
             title="현재 조회된 청구세트 목록을 엑셀(.xlsx) 파일로 다운로드합니다">
