@@ -2167,22 +2167,26 @@
     if (!app) return false;
     if (app.status === '서비스 취소' || app.status === '취소' || app.status === '미해당' || app.claimCategory === '제외') return false;
     if (app.claimCategory === '미청구(완료·무청구)') return false;
-    if (['완료', '종료', '정산완료', '진행완료'].includes(app.status)) return true;
-
     const now = new Date();
-    const todayStr = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
+    now.setHours(0, 0, 0, 0);
+    const ongoingStatuses = ['진행중', '간병중', '서비스 진행중'];
+    const endedStatuses = ['완료', '종료', '정산완료', '진행완료'];
+    const appStatus = String(app.status || '').trim();
+    const appAssignments = (window.gAssigns || [])
+      .filter(a => a && String(a.applyId) === String(app.id))
+      .sort((a, b) => String(b.startDate || '').localeCompare(String(a.startDate || '')));
+    const currentAssignment = typeof window.getActiveCaregiverAssignment === 'function'
+      ? window.getActiveCaregiverAssignment(app, appAssignments)
+      : appAssignments[0];
+    const assignmentStatus = String(currentAssignment && currentAssignment.status || '').trim();
+    const assignmentEnd = parseDateOnly(currentAssignment && currentAssignment.endDate);
 
-    const rawEnd = app.careEndDate || app.endDate;
-    if (rawEnd) {
-      const cleanEnd = formatHyundaiDate(rawEnd);
-      if (cleanEnd !== '-' && cleanEnd <= todayStr) return true;
-    }
+    if (ongoingStatuses.includes(appStatus) || ongoingStatuses.includes(assignmentStatus) ||
+        (assignmentEnd && assignmentEnd > now)) return false;
+    if (endedStatuses.includes(appStatus) || ['완료', '종료', '간병종료'].includes(assignmentStatus)) return true;
 
-    const as = (window.gAssigns || []).find(a => String(a.applyId) === String(app.id));
-    if (as) {
-      if (['완료', '종료', '간병종료'].includes(as.status)) return true;
-      if (as.endDate && as.endDate.replace(/-/g, '.') <= todayStr) return true;
-    }
+    const careEnd = assignmentEnd || parseDateOnly(app.careEndDate || app.endDate);
+    if (careEnd) return careEnd <= now;
 
     return false;
   }
