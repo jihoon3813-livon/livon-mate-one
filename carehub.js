@@ -9330,6 +9330,14 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
   const rounds = schedule.rounds;
   const totalPayoutSum = schedule.confirmedPayoutSum;
 
+  // 신청서 기준 간병기간 진행률 (배정이 없는 경우 표시)
+  const appStartVal = app.careStartDate || app.desiredDate || app.desiredStartDate || '';
+  const appEndVal = app.careEndDate || app.expectedEndDate || '';
+  const appProg = (!hasAssign && appStartVal) ? getCareProgressInfo({
+    startDate: appStartVal.includes(':') ? appStartVal : `${appStartVal} 09:00`,
+    endDate: appEndVal ? (appEndVal.includes(':') ? appEndVal : `${appEndVal} 09:00`) : '진행중'
+  }) : null;
+
   const appTotalClaim = (appClaims && appClaims.length > 0)
     ? appClaims.reduce((sum, c) => sum + (Number(c.claimAmount) || 0), 0)
     : (schedule.confirmedClaimSum || schedule.totalOngoingClaimEst || (schedule.rounds || []).reduce((acc, r) => acc + (r.fullClaimAmount || 0), 0));
