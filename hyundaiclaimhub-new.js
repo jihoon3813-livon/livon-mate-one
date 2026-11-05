@@ -102,9 +102,11 @@
   }
 
   /**
-   * 24시간제 간병일수 산정 규칙 (기존 carehub.js 핵심 규칙 100% 일치)
-   * - 24시간 이하는 1일
-   * - 24시간 + 1분 초과 시마다 +1일
+   * 24시간제 간병일수 산정 규칙
+   * - 기본 일수: 시작일자 ~ 종료일자 간의 포함 일수 (예: 10.31 ~ 11.06 -> 7일)
+   * - 시작시간과 종료시간이 동일한 경우(예: 08:00 ~ 08:00): 기본 일수 유지 (7일)
+   * - 종료시간이 시작시간을 초과하는 경우(예: 08:00 ~ 18:00): 24시간 초과 근무로 +1일 (8일)
+   * - 시작일과 종료일이 같은 날짜인 경우: 1일
    */
   function calculateCareDays24h(startInput, endInput) {
     if (!startInput || !endInput) return 0;
@@ -115,10 +117,19 @@
     const diffMs = dEnd.getTime() - dStart.getTime();
     if (diffMs <= 0) return 1;
 
-    const diffMinutes = Math.round(diffMs / 60000);
-    if (diffMinutes <= 0) return 1;
+    const dStartOnly = new Date(dStart.getFullYear(), dStart.getMonth(), dStart.getDate());
+    const dEndOnly = new Date(dEnd.getFullYear(), dEnd.getMonth(), dEnd.getDate());
+    const baseDays = Math.round((dEndOnly.getTime() - dStartOnly.getTime()) / (24 * 60 * 60 * 1000)) + 1;
 
-    return Math.max(1, Math.ceil(diffMinutes / 1440));
+    const startMinutes = dStart.getHours() * 60 + dStart.getMinutes();
+    const endMinutes = dEnd.getHours() * 60 + dEnd.getMinutes();
+
+    // 시작일자와 종료일자가 다르고, 종료시간이 시작시간을 1분 이상 초과하는 경우 +1일 추가
+    if (baseDays > 1 && endMinutes > startMinutes) {
+      return baseDays + 1;
+    }
+
+    return Math.max(1, baseDays);
   }
 
   /**
@@ -3263,40 +3274,26 @@ function calculateDuePeriods3(startDateStr, endDateStr, isEnded, as) {
 
           */
 
-          let endTimePart = '18:00';
+          // 간병 시작 시간(HH:mm) 추출 (기본값 '09:00')
+          const careStartTimeMatch = String(careStart).match(/\b\d{1,2}:\d{2}\b/);
+          const careStartTime = careStartTimeMatch ? careStartTimeMatch[0] : '09:00';
+
+          // [규칙 1] 시작시간과 종료시간은 간병시작 시간과 동일하게 맞춘다.
+          // 예: 2026.10.20 08:00 ~ 진행중 대상자는 2026.10.31 08:00 ~ 2026.11.06 08:00
+          const startTimePart = careStartTime;
+
+          // 종료시간: 기본적으로 간병시작 시간과 동일하게 맞춤
+          // 단, 간병이 실제 종료된 건이고 간병종료일시(careEnd)에 명시적인 종료시간이 있는 경우 해당 종료시간 사용
+          let endTimePart = careStartTime;
           if (period.isFinalCutoff && careEnd && String(careEnd).includes(':')) {
-            endTimePart = String(careEnd).split(' ')[1] || '18:00';
+            const careEndTimeMatch = String(careEnd).match(/\b\d{1,2}:\d{2}\b/);
+            if (careEndTimeMatch) {
+              endTimePart = careEndTimeMatch[0];
+            }
           }
 
-          /*
-          const careStartDateOnly = formatDateStr(parseDateOnly(careStart));
-          const careStartTimeMatch = String(careStart).match(/\b\d{1,2}:\d{2}\b/);
-
-          const startTimePart =
-            period.startDate === careStartDateOnly && careStartTimeMatch
-              ? careStartTimeMatch[0]
-              : '09:00';
-          
-
           const startDateStr = `${period.startDate} ${startTimePart}`;
-          */
-
-          // 2026.11.04 신규 세트 생성 시의 시작일시 매핑 규칙 보완
-          // careStart 문자열에서 날짜와 시간(HH:mm) 추출
-          const careStartDateOnly = formatDateStr(parseDateOnly(careStart));
-          const careStartTimeMatch = String(careStart).match(/\b\d{1,2}:\d{2}\b/);
-          const customStartTime = careStartTimeMatch ? careStartTimeMatch[0] : '09:00';
-
-          // 정산 시작일(period.startDate)이 B간병사의 실제 시작일과 일치하면 실제 시작 시간 사용,
-          // 그 외 일반 정산 주간 첫날인 경우 기본 09:00 매핑
-          const startTimePart = (period.startDate === careStartDateOnly)
-            ? customStartTime
-            : '09:00';
-
-          const startDateStr = `${period.startDate} ${startTimePart}`;
-
-          let endDateStr = '';
-          endDateStr = `${period.endDate} ${endTimePart}`;
+          const endDateStr = `${period.endDate} ${endTimePart}`;
 
           const days = calculateCareDays24h(startDateStr, endDateStr) || period.days || 1;
           const claimAmount = days * dailyClaimPrice;
