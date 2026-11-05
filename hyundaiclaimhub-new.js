@@ -38,6 +38,7 @@
   var gHyundaiNewModalObserver = null;
   var gHyundaiNewModalWasOpen = false;
   var gHyundaiNewPendingSnapshot = null;
+  var gHyundaiNewSnapshotLoaded = false;
 
   // -----------------------------------------------------------------------
   // 1. 유틸리티 헬퍼 함수
@@ -306,6 +307,22 @@
   // -----------------------------------------------------------------------
   // 3. 청구세트 데이터 조회 및 정규화
   // -----------------------------------------------------------------------
+  function isHyundaiSettlementFaxForRound(record, roundNumber) {
+    if (!record || !(record.sentDate || record.sentAt) ||
+        !['성공', '전송완료', '발송완료'].includes(String(record.status || '').trim())) return false;
+    const targetRound = Number(roundNumber);
+    const recordRound = Number(record.roundNumber);
+    const category = String(record.category || '').trim();
+    const caseType = String(record.caseType || '').trim();
+    const isExactSettlementCategory = category ? category === '정산청구' : caseType === '정산청구';
+    const isLegacyFirstRoundSettlementCategory = targetRound === 1 && category.includes('정산');
+    if (!isExactSettlementCategory && !isLegacyFirstRoundSettlementCategory) return false;
+    if (Number.isFinite(recordRound) && recordRound > 0) {
+      return recordRound === targetRound || isLegacyFirstRoundSettlementCategory;
+    }
+    return targetRound === 1;
+  }
+
   function getHyundaiClaimSets() {
     const apps = Array.isArray(window.gApps) ? window.gApps : [];
     const assigns = Array.isArray(window.gAssigns) ? window.gAssigns : [];
@@ -352,32 +369,29 @@
     const getModalClaimDisplay = (app, round) => {
       const roundFaxLog = (window.gFaxLogs || []).find(log =>
         String(log.appId) === String(app.id) &&
-        (log.roundNumber === round.roundNumber ||
-          (log.memo && log.memo.includes(`${round.roundNumber}차`)) ||
-          (round.roundNumber === 1 && log.category && log.category.includes('정산')))
+        isHyundaiSettlementFaxForRound(log, round.roundNumber)
       );
-      const rawFax = window.gFaxRecords && window.gFaxRecords[app.id];
-      // 상세 모달을 열 때 carehub.js는 faxRecords에서 최신 성공 건을
-      // gFaxRecords로 승격한다. 목록도 그 승격 결과를 동일하게 계산한다.
       const detailFaxCandidate = (window.gFaxLogs || [])
-        .filter(log => String(log.appId) === String(app.id) &&
-          log.caseType !== '현대해상 고객등록/조회' && log.formType !== 'HD_FORM_01' &&
-          ['성공', '전송완료', '발송완료'].includes(log.status))
+        .filter(log => String(log.appId) === String(app.id) && isHyundaiSettlementFaxForRound(log, 1) &&
+          (!Number(log.roundNumber) || Number(log.roundNumber) === 1))
         .sort((a, b) => String(b.sentDate || b.sentAt || '').localeCompare(String(a.sentDate || a.sentAt || '')))[0];
       const faxSource = detailFaxCandidate ? {
         ...detailFaxCandidate,
         status: '전송완료',
         sentDate: detailFaxCandidate.sentDate || detailFaxCandidate.sentAt || null
-      } : rawFax;
-      const faxInfo = faxSource && faxSource.status === '전송완료' &&
-        faxSource.caseType !== '현대해상 고객등록/조회' && faxSource.formType !== 'HD_FORM_01'
-        ? faxSource : null;
+      } : null;
+      const faxInfo = isHyundaiSettlementFaxForRound(faxSource, round.roundNumber) ? faxSource : null;
+      const existingClaimStatuses = [round.existingClaim && round.existingClaim.adjusterStatus,
+        round.existingClaim && round.existingClaim.status].map(status => String(status || '').trim());
+      // 새 세트의 청구 레코드가 명시적으로 청구전이면, 차수 번호만 겹치는 과거 팩스로그가
+      // 그 세트의 청구완료 근거로 잘못 붙지 않도록 한다.
+      const hasExplicitPendingClaim = Boolean(round.existingClaim && existingClaimStatuses.includes('청구전') && !round.existingClaim.claimDate);
       // carehub.js 상세 청구 카드의 rawClaimDate 및 isClaimDone 판정을 그대로 따른다.
-      const rawClaimDate = round.claimDate ||
+      const rawClaimDate = hasExplicitPendingClaim ? '' : (round.claimDate ||
         (roundFaxLog && roundFaxLog.sentDate) ||
         (round.existingClaim && (round.existingClaim.faxSentDate || round.existingClaim.claimDate)) ||
-        (round.roundNumber === 1 && faxInfo && faxInfo.sentDate) || '';
-      const isClaimPending = Boolean(round.claimStatus === '청구전' && !round.claimDate && !round.existingClaim);
+        (faxInfo && faxInfo.sentDate) || '');
+      const isClaimPending = hasExplicitPendingClaim || Boolean(round.claimStatus === '청구전' && !round.claimDate && !round.existingClaim);
       const isClaimDone = !isClaimPending && Boolean(
         (round.existingClaim && (round.existingClaim.claimDate || round.existingClaim.faxStatus === '전송완료' || round.existingClaim.status === '청구완료')) ||
         rawClaimDate || round.claimDate || round.claimStatus === '청구완료'
@@ -409,9 +423,12 @@
       const normalizeStandardDate = value => String(value || '').slice(0, 10).replace(/-/g, '.');
 
       orderedClaims.forEach((claim, idx) => {
-        const claimSet = customSets.find(set => set.claimId && String(set.claimId) === String(claim.id)) ||
-          customSets.find(set => claim.round && normalizeRoundLabel(set.claimRound || set.payoutRound) === normalizeRoundLabel(claim.round)) ||
-          customSets.find(set => claim.standardDate && normalizeStandardDate(set.claimStandardDate || set.endDateStr) === normalizeStandardDate(claim.standardDate));
+        const claimDateKey = normalizeStandardDate(claim.standardDate || claim.endDate);
+        const claimSet = customSets.find(set => claimDateKey && set.claimId && String(set.claimId) === String(claim.id) &&
+            claimDateKey === normalizeStandardDate(set.claimStandardDate || set.endDateStr)) ||
+          customSets.find(set => claimDateKey && claimDateKey === normalizeStandardDate(set.claimStandardDate || set.endDateStr)) ||
+          customSets.find(set => set.claimId && String(set.claimId) === String(claim.id)) ||
+          customSets.find(set => claim.round && normalizeRoundLabel(set.claimRound || set.payoutRound) === normalizeRoundLabel(claim.round));
         const modalRound = modalRounds.find(round => round.existingClaim && String(round.existingClaim.id) === String(claim.id)) ||
           (claimSet && modalRounds.find(round => Number(round.setIndex || round.roundNumber) === Number(claimSet.setIndex))) ||
           modalRounds.find(round => (!round.existingClaim || String(round.existingClaim.id) === String(claim.id)) &&
@@ -443,8 +460,9 @@
           existingClaim: claim
         };
         const modalClaimDisplay = getModalClaimDisplay(app, displayRound);
-        const modalClaimDate = modalClaimDisplay.claimDate;
-        const claimStatus = modalClaimDisplay.claimStatus;
+        const explicitPendingSet = Boolean(claimSet && String(claimSet.claimStatus || '').trim() === '청구전' && !String(claimSet.claimDate || '').trim());
+        const modalClaimDate = explicitPendingSet ? '' : modalClaimDisplay.claimDate;
+        const claimStatus = explicitPendingSet ? '청구전' : modalClaimDisplay.claimStatus;
         const rawClaimStatus = String(claim.adjusterStatus || claim.status || '').trim();
         const rawDepositStatus = String(claim.depositStatus || '').trim();
         const isFullyDeposited = isClaimDepositConfirmedNew(claim) ||
@@ -564,6 +582,7 @@
     window.gPayouts = snapshot.payouts.filter(item => item && !deletedAppIds.has(String(item.applyId || '')));
     window.gConvexDataApplied = true;
     window.gIsDataLoading = false;
+    gHyundaiNewSnapshotLoaded = true;
 
     try {
       if (typeof window.safeSaveCachedApps === 'function') window.safeSaveCachedApps(window.gApps);
@@ -895,27 +914,39 @@
       const expanded = group.isExpanded;
       const visibleCount = group.rows.length;
       const totalCount = group.allRows.length;
+      const hasExistingFaxClaimTarget = group.allRows.some(row => isFaxClaimNeeded(row));
       return `
         <tr class="bg-white border-t-2 border-slate-300">
           <td colspan="22" class="p-0">
-            <button type="button"
-              onclick="window.toggleHyundaiNewCustomerGroup('${escapeHtml(group.appId)}')"
-              aria-expanded="${expanded ? 'true' : 'false'}"
-              class="w-full px-4 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-2 text-left hover:bg-amber-50/70 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-400 ${expanded ? 'bg-amber-50/40' : 'bg-white'}">
-              <span class="flex flex-wrap items-center gap-2 lg:gap-3 min-w-0">
-                <i data-lucide="${expanded ? 'chevron-down' : 'chevron-right'}" class="w-4 h-4 text-amber-700 shrink-0"></i>
-                <span class="font-mono font-black text-slate-800 text-xs px-2 py-1 rounded-lg bg-slate-100 border border-slate-200">${escapeHtml(group.appId)}</span>
-                <span class="font-black text-slate-900 text-sm truncate">${escapeHtml(group.patientName)}</span>
-                <span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-800 border border-sky-200">간병기간: ${escapeHtml(group.carePeriodLabel)}</span>
-                ${group.claimNeeded ? `<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300" title="${escapeHtml(group.claimNeededThrough)}까지 청구요청이 확인되지 않은 간병 기간이 있습니다">청구필요</span>` : ''}
-                <span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">${totalCount ? `검색 결과 ${visibleCount}/${totalCount}세트` : '등록된 청구세트 없음'}</span>
-              </span>
-              <span class="flex flex-wrap items-center gap-x-3 gap-y-1 pl-7 lg:pl-0 text-[10px] font-semibold text-slate-600">
-                <span>청구 ${formatNumber(group.claimAmount)}원 <b class="text-amber-700">· 대기 ${group.unclaimedCount}</b></span>
-                <span>입금 ${formatNumber(group.depositAmount)}원 <b class="text-rose-600">· 입금 미완료 ${group.undepositedCount}</b></span>
-                <span>지급 ${formatNumber(group.payoutAmount)}원 <b class="text-purple-700">· 대기 ${group.unpaidPayoutCount}</b></span>
-              </span>
-            </button>
+            <div class="w-full px-4 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-2 ${expanded ? 'bg-amber-50/40' : 'bg-white'}">
+              <div class="min-w-0 flex-1 flex flex-col lg:flex-row lg:items-center justify-between gap-2">
+                <div class="flex flex-wrap items-center gap-2 lg:gap-3 min-w-0">
+                  <button type="button"
+                    onclick="window.toggleHyundaiNewCustomerGroup('${escapeHtml(group.appId)}')"
+                    aria-expanded="${expanded ? 'true' : 'false'}"
+                    class="flex flex-wrap items-center gap-2 lg:gap-3 min-w-0 text-left hover:bg-amber-50/70 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-400">
+                    <i data-lucide="${expanded ? 'chevron-down' : 'chevron-right'}" class="w-4 h-4 text-amber-700 shrink-0"></i>
+                    <span class="font-mono font-black text-slate-800 text-xs px-2 py-1 rounded-lg bg-slate-100 border border-slate-200">${escapeHtml(group.appId)}</span>
+                    <span class="font-black text-slate-900 text-sm truncate">${escapeHtml(group.patientName)}</span>
+                    <span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-800 border border-sky-200">간병기간: ${escapeHtml(group.carePeriodLabel)}</span>
+                    ${group.claimNeeded ? `<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300" title="${escapeHtml(group.claimNeededThrough)}까지 청구요청이 확인되지 않은 간병 기간이 있습니다">청구필요</span>` : ''}
+                    <span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">${totalCount ? `검색 결과 ${visibleCount}/${totalCount}세트` : '등록된 청구세트 없음'}</span>
+                  </button>
+                  ${group.claimNeeded && gHyundaiNewSnapshotLoaded && !hasExistingFaxClaimTarget ? `
+                    <button type="button" onclick="window.openSettlementSetAddModal ? window.openSettlementSetAddModal('${escapeHtml(group.appId)}') : alert('세트 추가 모달을 불러올 수 없습니다.')"
+                      class="shrink-0 px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black shadow-xs inline-flex items-center gap-1 cursor-pointer"
+                      title="상세와 같은 날짜 자동 설정으로 청구·정산 세트를 추가합니다">
+                      <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> + 세트 추가
+                    </button>
+                  ` : ''}
+                </div>
+                <span class="flex flex-wrap items-center gap-x-3 gap-y-1 pl-7 lg:pl-0 text-[10px] font-semibold text-slate-600">
+                  <span>청구 ${formatNumber(group.claimAmount)}원 <b class="text-amber-700">· 대기 ${group.unclaimedCount}</b></span>
+                  <span>입금 ${formatNumber(group.depositAmount)}원 <b class="text-rose-600">· 입금 미완료 ${group.undepositedCount}</b></span>
+                  <span>지급 ${formatNumber(group.payoutAmount)}원 <b class="text-purple-700">· 대기 ${group.unpaidPayoutCount}</b></span>
+                </span>
+              </div>
+            </div>
           </td>
         </tr>
       `;
@@ -1337,11 +1368,20 @@
                     class="w-24 px-1 py-1 text-[11px] font-mono font-black text-blue-700 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-blue-300 focus:border-blue-500 rounded text-right focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all"
                     title="청구 총금액 (직접 수정 가능)">
                 </td>
-                <!-- 청구 상태는 서버/청구 데이터 기준 표시 전용 -->
+                <!-- 상세와 동일한 청구완료 입력 / 청구취소(원복) 동작 -->
                 <td class="py-1 px-2 text-center bg-blue-50/20" id="cell-claimStatus-${rowKey}">
-                  <span class="inline-block px-2 py-1 text-[10px] font-bold rounded-md border shadow-2xs ${claimStatusColor}">
-                    ${escapeHtml(row.claimStatus || '청구전')}
-                  </span>
+                  ${['청구전', '청구완료'].includes(row.claimStatus) ? `
+                    <select onchange="window.handleHyundaiNewClaimStatusAction('${escapeHtml(row.appId)}', ${row.setIndex}, this)"
+                      class="px-2 py-1 text-[10px] font-bold rounded-md border shadow-2xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 ${claimStatusColor}"
+                      title="청구 상태 변경">
+                      <option value="청구전" ${row.claimStatus === '청구전' ? 'selected' : ''}>청구전</option>
+                      <option value="청구완료" ${row.claimStatus === '청구완료' ? 'selected' : ''}>청구완료</option>
+                    </select>
+                  ` : `
+                    <span class="inline-block px-2 py-1 text-[10px] font-bold rounded-md border shadow-2xs ${claimStatusColor}">
+                      ${escapeHtml(row.claimStatus || '청구전')}
+                    </span>
+                  `}
                 </td>
 
                 <!-- STEP 2. 입금 -->
@@ -1627,6 +1667,106 @@
     setTimeout(() => {
       element.classList.remove('bg-rose-100', 'border-rose-400');
     }, 2000);
+  }
+
+  async function handleHyundaiNewClaimStatusAction(appId, setIndex, selectEl = null) {
+    const app = (window.gApps || []).find(item => String(item.id) === String(appId));
+    const appSet = app && Array.isArray(app.customSettlementSets)
+      ? app.customSettlementSets.find(item => Number(item.setIndex) === Number(setIndex))
+      : null;
+    const row = getHyundaiClaimSets().find(item => String(item.appId) === String(appId) && Number(item.setIndex) === Number(setIndex));
+    const cSet = appSet || (row && row.cSet);
+    const claim = (row && row.claimRecord) || (window.gClaims || []).find(item => item &&
+      ((cSet && cSet.claimId && String(item.id) === String(cSet.claimId)) ||
+       (String(item.applyId) === String(appId) && cSet && String(item.round || '').trim() === String(cSet.claimRound || '').trim())));
+    if (!app || !cSet || !claim) {
+      if (selectEl && row) selectEl.value = row.claimStatus || '청구전';
+      return;
+    }
+    const currentStatus = String(row && row.claimStatus || cSet.claimStatus || claim.adjusterStatus || claim.status || '청구전').trim();
+
+    if (['입금완료', '수납완료'].includes(currentStatus) ||
+        ['입금완료', '수납완료'].includes(String(cSet.depositStatus || '').trim()) ||
+        (Number(cSet.claimAmount) > 0 && Number(cSet.depositAmount) >= Number(cSet.claimAmount))) {
+      if (selectEl) selectEl.value = currentStatus;
+      if (typeof window.showNotification === 'function') {
+        window.showNotification({ type: 'warning', title: '청구 상태 변경 불가', message: '입금완료된 청구세트는 청구전으로 원복할 수 없습니다.' });
+      }
+      return;
+    }
+
+    if (currentStatus !== '청구완료') {
+      if (typeof window.openManualFaxClaimModal === 'function') {
+        window.openManualFaxClaimModal(appId, Number(setIndex));
+        if (selectEl) selectEl.value = currentStatus;
+      } else {
+        if (selectEl) selectEl.value = currentStatus;
+        alert('청구완료 입력 모달을 불러올 수 없습니다. 상세 화면에서 다시 시도해주세요.');
+      }
+      return;
+    }
+
+    const claimAmount = Number(claim.claimAmount || cSet.claimAmount) || 0;
+    const confirmText = `[${app.patientName || '고객'}] ${cSet.claimRound || claim.round || `${setIndex}차`} 청구를 취소하고 청구전으로 원복할까요?\n\n청구번호: ${claim.id || cSet.claimId || '-'}\n청구금액: ${formatNumber(claimAmount)}원\n\n청구완료 일시와 발송 표시를 지우고 청구 상태를 청구전으로 되돌립니다.`;
+    const confirmed = typeof window.showCustomConfirm === 'function'
+      ? await window.showCustomConfirm(confirmText, {
+          theme: 'fax', icon: 'rotate-ccw', title: '청구 취소(원복)',
+          confirmText: '청구전으로 원복', cancelText: '취소'
+        })
+      : window.confirm(confirmText);
+    if (!confirmed) {
+      if (selectEl) selectEl.value = currentStatus;
+      return;
+    }
+
+    // 상세의 청구취소(원복)처럼 날짜/발송표시를 되돌리되, 목록은 claims 레코드로 행을
+    // 구성하므로 레코드는 유지하고 상태를 청구전으로 바꾼다.
+    claim.status = '청구전';
+    claim.adjusterStatus = '청구전';
+    delete claim.claimDate;
+    delete claim.faxStatus;
+    delete claim.faxSentDate;
+    claim.updatedAt = new Date().toISOString();
+    cSet.claimStatus = '청구전';
+    delete cSet.claimDate;
+    delete cSet.faxStatus;
+    delete cSet.faxSentDate;
+    try {
+      localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(window.gClaims || []));
+      localStorage.setItem('LIVON_CLAIMS', JSON.stringify(window.gClaims || []));
+    } catch (error) { console.warn('[현대해상 청구 원복 캐시 저장 실패]', error); }
+    const appClaims = (window.gClaims || []).filter(item => item && String(item.applyId) === String(appId));
+    const isPaid = item => ['입금완료', '수납완료'].includes(String(item.depositStatus || item.status || item.adjusterStatus || '').trim());
+    app.claimCount = appClaims.length;
+    app.unconfirmedClaimCount = appClaims.filter(item => !isPaid(item)).length;
+    app.estimatedUnpaid = appClaims.filter(item => !isPaid(item))
+      .reduce((sum, item) => sum + (Number(item.unpaidAmount) || Number(item.claimAmount) || 0), 0);
+    app.hasManualUpdate = true;
+    app.updatedAt = new Date().toISOString();
+
+    try {
+      const response = await fetch('/api/hub/customer/update-fields', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appId: app.id, fields: { ...(Array.isArray(app.customSettlementSets) ? { customSettlementSets: app.customSettlementSets } : {}),
+          claimCount: app.claimCount, unconfirmedClaimCount: app.unconfirmedClaimCount,
+          estimatedUnpaid: app.estimatedUnpaid, hasManualUpdate: true } })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (typeof window.syncToConvex === 'function') {
+        const claimResult = await window.syncToConvex('sync:saveClaim', { claim });
+        if (!claimResult || claimResult.status !== 'success') throw new Error('청구 레코드 저장이 확인되지 않았습니다.');
+        const result = await window.syncToConvex('sync:saveApplication', { app });
+        if (!result || result.status !== 'success') throw new Error('신청서 저장이 확인되지 않았습니다.');
+      }
+    } catch (error) {
+      console.error('[현대해상 청구 상태 원복 저장 실패]', error);
+      alert('청구 상태 원복 저장을 확인하지 못했습니다. 새로고침 후 상태를 확인해주세요.');
+    }
+
+    renderHyundaiClaimHubNew();
+    if (typeof window.showNotification === 'function') {
+      window.showNotification({ type: 'success', title: '청구 취소(원복) 완료', message: `${cSet.claimRound || claim.round || `${setIndex}차`} 청구 상태를 청구전으로 변경했습니다.` });
+    }
   }
 
   function getEditableHyundaiClaimSet(app, setIndex) {
@@ -2210,7 +2350,6 @@
     const daysSinceFriday = (lastFriday.getDay() + 2) % 7;
     lastFriday.setDate(lastFriday.getDate() - (daysSinceFriday || 7));
     const normalizeId = value => String(value || '').trim().replace(/^H/, 'C');
-    const sentStatuses = new Set(['성공', '전송완료', '발송완료']);
 
     apps.filter(isHyundaiApp).forEach(app => {
       if (['서비스 취소', '취소', '미해당'].includes(app.status) ||
@@ -2234,16 +2373,14 @@
       const appClaims = claims.filter(c => c && normalizeId(c.applyId) === normalizeId(appId));
       const appFaxLogs = faxLogs.filter(log => log && normalizeId(log.appId) === normalizeId(appId));
       const latestDetailFax = appFaxLogs
-        .filter(log => log.caseType !== '현대해상 고객등록/조회' && log.formType !== 'HD_FORM_01' &&
-          sentStatuses.has(String(log.status || '').trim()))
+        .filter(log => isHyundaiSettlementFaxForRound(log, 1) &&
+          (!Number(log.roundNumber) || Number(log.roundNumber) === 1))
         .sort((a, b) => String(b.sentDate || b.sentAt || '').localeCompare(String(a.sentDate || a.sentAt || '')))[0];
-      const storedFax = window.gFaxRecords && window.gFaxRecords[appId];
       const detailClaimFax = latestDetailFax ? {
         ...latestDetailFax,
         status: '전송완료',
         sentDate: latestDetailFax.sentDate || latestDetailFax.sentAt || null
-      } : (storedFax && storedFax.status === '전송완료' &&
-        storedFax.caseType !== '현대해상 고객등록/조회' && storedFax.formType !== 'HD_FORM_01' ? storedFax : null);
+      } : null;
       const appPayouts = (Array.isArray(window.gPayouts) ? window.gPayouts : [])
         .filter(p => p && normalizeId(p.applyId) === normalizeId(appId));
       const customSets = Array.isArray(app.customSettlementSets) ? app.customSettlementSets : [];
@@ -2264,6 +2401,7 @@
           (amount > 0 && Number(claim.depositAmount) >= amount);
       };
       const isSetPaid = set => {
+        if (String(set.claimStatus || '').trim() === '청구전' && !String(set.claimDate || '').trim()) return false;
         const amount = Number(set.claimAmount) || 0;
         const linkedClaim = appClaims.find(claim =>
           (set.claimId && String(claim.id) === String(set.claimId)) ||
@@ -2282,28 +2420,31 @@
       let unrequestedClaimDue = false;
       appClaims.forEach(claim => {
         const roundNumber = Number(claim.roundNumber) || Number((String(claim.round || '').match(/(?:^|\s)(\d+)차/) || [])[1]);
-        const matchingSet = customSets.find(set =>
-          (claim.id && set.claimId && String(set.claimId) === String(claim.id)) ||
-          (roundNumber && Number(set.setIndex) === roundNumber)
-        );
+        const claimDateKey = [claim.endDate, claim.standardDate].map(parseDateOnly).find(Boolean)?.getTime();
+        const matchingSet = customSets.find(set => claim.id && set.claimId && String(set.claimId) === String(claim.id) &&
+            claimDateKey && [set.endDateStr, set.claimStandardDate].map(parseDateOnly).some(date => date && date.getTime() === claimDateKey)) ||
+          customSets.find(set => claimDateKey && [set.endDateStr, set.claimStandardDate].map(parseDateOnly).some(date => date && date.getTime() === claimDateKey)) ||
+          customSets.find(set => claim.id && set.claimId && String(set.claimId) === String(claim.id)) ||
+          customSets.find(set => roundNumber && Number(set.setIndex) === roundNumber);
         const matchingRound = scheduleRounds.find(round =>
           round.existingClaim && String(round.existingClaim.id) === String(claim.id)
         );
         const displayRoundNumber = Number((matchingRound && matchingRound.roundNumber) ||
           (matchingSet && matchingSet.setIndex) || roundNumber);
         const matchingFax = appFaxLogs.some(log =>
-          sentStatuses.has(String(log.status || '').trim()) && log.sentDate &&
-          roundNumber && Number(log.roundNumber) === roundNumber
+          isHyundaiSettlementFaxForRound(log, roundNumber)
         );
         const detailFaxRequestSent = displayRoundNumber === 1 && Boolean(detailClaimFax && detailClaimFax.sentDate);
         const claimStatuses = [claim.status, claim.adjusterStatus]
           .map(status => String(status || '').trim());
-        const requestSent = Boolean(String(claim.claimDate || '').trim()) || claim.faxStatus === '전송완료' || Boolean(claim.faxSentDate) ||
+        const explicitPendingSet = Boolean(matchingSet && String(matchingSet.claimStatus || '').trim() === '청구전' &&
+          !String(matchingSet.claimDate || '').trim());
+        const requestSent = !explicitPendingSet && (Boolean(String(claim.claimDate || '').trim()) || claim.faxStatus === '전송완료' || Boolean(claim.faxSentDate) ||
           claimStatuses.some(status => ['청구완료', '청구접수', '입금완료', '수납완료'].includes(status)) ||
           isClaimPaid(claim) || detailFaxRequestSent ||
           Number(claim.depositAmount) > 0 || matchingFax ||
           Boolean(matchingSet && matchingSet.claimDate &&
-            ['청구완료', '청구접수', '입금완료', '수납완료'].includes(String(matchingSet.claimStatus || '').trim()));
+            ['청구완료', '청구접수', '입금완료', '수납완료'].includes(String(matchingSet.claimStatus || '').trim())));
         const claimEnd = [
           claim.endDate,
           matchingSet && matchingSet.endDateStr,

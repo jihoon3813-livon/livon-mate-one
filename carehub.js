@@ -795,6 +795,22 @@ function getCareProgressInfo(assign) {
   };
 }
 
+function isSuccessfulSettlementFaxForRound(record, roundNumber) {
+  if (!record || !record.sentDate || !['성공', '전송완료', '발송완료'].includes(String(record.status || '').trim())) return false;
+  const targetRound = Number(roundNumber);
+  const recordRound = Number(record.roundNumber);
+  const category = String(record.category || '').trim();
+  const caseType = String(record.caseType || '').trim();
+  const isExactSettlementCategory = category ? category === '정산청구' : caseType === '정산청구';
+  const isLegacyFirstRoundSettlementCategory = targetRound === 1 && category.includes('정산');
+  if (!isExactSettlementCategory && !isLegacyFirstRoundSettlementCategory) return false;
+
+  if (Number.isFinite(recordRound) && recordRound > 0) {
+    return recordRound === targetRound || isLegacyFirstRoundSettlementCategory;
+  }
+  return targetRound === 1;
+}
+
 // =========================================================================
 // CTI (Computer Telephony Integration) Outbound Click-to-Call Engine
 // =========================================================================
@@ -2030,11 +2046,10 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
 
         const targetAppId = String(app ? app.id : '');
         const faxLogList = (window._gFaxLogsByAppId && window._gFaxLogsByAppId.get(targetAppId)) || window.gFaxLogs || [];
-        const roundFaxLog = faxLogList.find(fl => 
-          String(fl.appId) === targetAppId && 
-          (fl.roundNumber === setIndex || (fl.memo && fl.memo.includes(`${setIndex}차`)) || (fl.category && fl.category.includes('정산') && setIndex === 1))
+        const roundFaxLog = faxLogList.find(fl =>
+          String(fl.appId) === targetAppId && isSuccessfulSettlementFaxForRound(fl, setIndex)
         );
-        const isFaxClaimSent = Boolean(roundFaxLog && roundFaxLog.sentDate && (roundFaxLog.status === '전송완료' || roundFaxLog.status === '발송완료' || roundFaxLog.status === '성공'));
+        const isFaxClaimSent = Boolean(roundFaxLog);
 
         let claimStatus = 'UPCOMING_WAIT';
         if (claimForRound) {
@@ -8485,14 +8500,15 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
             </div>
           ` : rounds.map(r => {
             const roundFaxLog = (window.gFaxLogs || []).find(fl => 
-              String(fl.appId) === String(app.id) && 
-              (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (r.roundNumber === 1 && fl.category && fl.category.includes('정산')))
+              String(fl.appId) === String(app.id) && isSuccessfulSettlementFaxForRound(fl, r.roundNumber)
             );
 
-            const rawClaimDate = r.claimDate ||
+            const hasExplicitPendingClaim = Boolean(r.existingClaim &&
+              [r.existingClaim.adjusterStatus, r.existingClaim.status].some(status => String(status || '').trim() === '청구전') &&
+              !r.existingClaim.claimDate);
+            const rawClaimDate = hasExplicitPendingClaim ? null : (r.claimDate ||
               (roundFaxLog && roundFaxLog.sentDate) ||
-              (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
-              ((r.roundNumber === 1 && faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null);
+              (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || null);
 
             // 삼성화재인 경우 간병기간(종료일 우선, 시작일 보조)을 기준으로 몇월 청구 대상인지 산출
             let targetYear = r.targetYear || '';
@@ -8534,7 +8550,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
             // 본인에게 실제로 발송된 개별 청구 메일(samsungIndividualLog)이나 정식 청구서(r.existingClaim)가 있을 때만 청구완료로 인정
             const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
             const isSamsungClaimSent = Boolean(!isRoundCancelled && (samsungIndividualLog || isCustomRoundSent));
-            const isClaimPending = Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
+            const isClaimPending = hasExplicitPendingClaim || Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
             const isClaimDone = !isClaimPending && (isSamsung 
               ? (isSamsungClaimSent || Boolean(!isRoundCancelled && r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)) || Boolean(!isRoundCancelled && (r.claimDate || r.claimStatus === '청구완료')))
               : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료' || r.existingClaim.status === '청구완료')) || Boolean(rawClaimDate) || Boolean(r.claimDate || r.claimStatus === '청구완료')));
@@ -9950,12 +9966,13 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 <div class="space-y-2">
                   ${rounds.map(r => {
                     const roundFaxLog = (window.gFaxLogs || []).find(fl => 
-                      String(fl.appId) === String(app.id) && 
-                      (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (r.roundNumber === 1 && fl.category && fl.category.includes('정산')))
+                      String(fl.appId) === String(app.id) && isSuccessfulSettlementFaxForRound(fl, r.roundNumber)
                     );
-                    const faxSentDateStr = (roundFaxLog && roundFaxLog.sentDate) ||
-                      (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
-                      ((r.roundNumber === 1 && faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null) || '';
+                    const hasExplicitPendingClaim = Boolean(r.existingClaim &&
+                      [r.existingClaim.adjusterStatus, r.existingClaim.status].some(status => String(status || '').trim() === '청구전') &&
+                      !r.existingClaim.claimDate);
+                    const faxSentDateStr = hasExplicitPendingClaim ? '' : ((roundFaxLog && roundFaxLog.sentDate) ||
+                      (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || '');
 
                     const isRoundCancelled = Boolean(app.cancelledSamsungRounds && app.cancelledSamsungRounds[r.roundNumber]);
 
@@ -9976,7 +9993,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
                     const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
                     const isSending = Boolean(window.gBarobillSendingRounds && window.gBarobillSendingRounds.has(`${app.id}_${r.roundNumber}`));
-                    const isClaimPending = Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
+                    const isClaimPending = hasExplicitPendingClaim || Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
                     const isClaimDone = !isClaimPending && (isSamsung
                       ? (!isRoundCancelled && (Boolean(samsungIndividualLog) || isCustomRoundSent || Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate))))
                       : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(faxSentDateStr)));
