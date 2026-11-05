@@ -1076,7 +1076,7 @@
             class="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer whitespace-nowrap">선택 해제</button>` : ''}
            <button type="button" onclick="window.runHyundaiClaimSetAutoGeneration()" 
             class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-xs font-black inline-flex items-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-            title="10일, 20일, 말일 또는 간병종료일에 해당하는 신규 청구세트를 자동으로 검출하여 생성합니다">
+            title="매주 금요일 정산 기준(직전 토요일~오늘 금요일)으로 신규 청구세트를 자동으로 검출하여 생성합니다 (금요일 전용)">
             <i data-lucide="zap" class="w-4 h-4 text-amber-100"></i>
             <span>청구세트 자동 생성 실행</span>
           </button> 
@@ -2838,36 +2838,25 @@
 
 
 
-// 3차 개발. 금요일 정산으로 변경
-function calculateDuePeriods(startDateStr, endDateStr, isEnded, as) {
+// [금요일 주간 정산 규칙]
+// 1. 금요일 확인: 오늘이 금요일(getDay() === 5)이 아니면 실행되지 않음
+// 2. 정산 대상 금요일: 오늘이 금요일이므로 settlementFriday는 오늘(now)
+// 3. 이번 주 정산 범위 설정:
+//    - 기간 종료일(actualEnd): 오늘(금요일) (단, 이번 주 내 종료된 간병은 실제 종료일)
+//    - 기간 시작일(actualStart): 이번 주 범위 시작일인 직전 토요일(6일 전, settlementFriday - 6)
+//    - 간병시작일 예외 처리: 만약 이 간병인의 시작일(start)이 직전 토요일보다 늦다면(예: 이번 주 월요일 시작), 실제 시작일(start)을 시작점으로 설정
+function calculateDuePeriods(startDateStr, endDateStr, isEnded, as, baseDate = null) {
   const start = parseDateOnly(startDateStr);
   if (!start) return [];
 
-  const now = new Date();
+  const now = baseDate ? new Date(baseDate) : new Date();
   now.setHours(0, 0, 0, 0);
 
-  let end = parseDateOnly(endDateStr);
+  // 1. 금요일 확인: 오늘이 금요일(5)이 아니면 대상 아님
+  if (now.getDay() !== 5) return [];
 
-  // 종료된 간병인데 종료일이 없다면 잘못된 최종 세트를 만들지 않는다.
-  if (isEnded && !end) return [];
-
-  // 진행 중인 간병은 오늘을 계산 종료일로 사용한다.
-  if (!isEnded) {
-    end = new Date(now);
-  }
-
-  if (!end || end < start) return [];
-
-  // 가장 최근 금요일을 주간 청구 기준일로 사용한다.
-  function getMostRecentFriday(date) {
-    const result = new Date(date);
-    result.setHours(0, 0, 0, 0);
-
-    const diff = (result.getDay() + 2) % 7;
-    result.setDate(result.getDate() - diff);
-
-    return result;
-  }
+  // 2. 정산 대상 금요일: 오늘이 금요일이므로 settlementFriday는 오늘(now)
+  const settlementFriday = new Date(now);
 
   function addDays(date, days) {
     const result = new Date(date);
@@ -2875,30 +2864,29 @@ function calculateDuePeriods(startDateStr, endDateStr, isEnded, as) {
     return result;
   }
 
-  // 진행 중이면 가장 최근 금요일이 정산 기준일이다.
-  // 종료됐으면 종료일이 속한 주의 정산 금요일을 기준으로 한다.
-  const settlementFriday = isEnded
-    ? getMostRecentFriday(end)
-    : getMostRecentFriday(now);
-
-  // 정산 기간은 토요일부터 금요일까지다.
+  // 3. 이번 주 정산 범위 설정
+  // 기간 시작일: 이번 주 범위 시작일인 직전 토요일 (6일 전, settlementFriday - 6)
   const periodStart = addDays(settlementFriday, -6);
 
-  // 간병 시작일이 이번 정산 기간보다 늦으면 실제 시작일부터 계산한다.
+  // 간병시작일 예외 처리: 만약 이 간병인의 시작일(start)이 직전 토요일보다 늦다면 실제 시작일(start)을 시작점으로 설정
   const actualStart = start > periodStart
     ? new Date(start)
     : new Date(periodStart);
 
-  // 진행 중인 간병은 금요일까지,
-  // 종료된 간병은 실제 종료일까지 정산한다.
-  const actualEnd = isEnded
+  let end = parseDateOnly(endDateStr);
+  // 종료된 간병인데 종료일이 없다면 잘못된 최종 세트를 만들지 않는다.
+  if (isEnded && !end) return [];
+
+  // 기간 종료일(actualEnd): 오늘(금요일)
+  // 단, 종료된 간병이고 실제 종료일이 금요일 이전인 경우 실제 종료일까지 정산
+  const actualEnd = (isEnded && end && end < settlementFriday)
     ? new Date(end)
     : new Date(settlementFriday);
 
   if (actualStart > actualEnd) return [];
+  if (start > settlementFriday) return [];
 
-  // 금요일이 해당 월의 몇 번째 금요일인지 계산한다.
-  // 예: 10월 2일 = 1차, 10월 9일 = 2차
+  // 금요일이 해당 월의 몇 번째 주차(회차)인지 계산 (예: 10월 2일 = 1차, 10월 9일 = 2차)
   const roundNum = Math.ceil(settlementFriday.getDate() / 7);
   const targetYear = settlementFriday.getFullYear();
   const targetMonth = settlementFriday.getMonth() + 1;
@@ -2918,9 +2906,9 @@ function calculateDuePeriods(startDateStr, endDateStr, isEnded, as) {
     targetMonth,
     startDate: formatDateStr(actualStart),
     endDate: formatDateStr(actualEnd),
-    standardDate: formatDateStr(actualEnd),
+    standardDate: formatDateStr(settlementFriday),
     days,
-    isFinalCutoff: isEnded
+    isFinalCutoff: Boolean(isEnded && (!end || end <= settlementFriday))
   }];
 }
     
@@ -3122,6 +3110,18 @@ function calculateDuePeriods3(startDateStr, endDateStr, isEnded, as) {
   async function runHyundaiClaimSetAutoGeneration(suppressAlert = false) {
     if (gHyundaiNewAutoGenerating) {
       if (!suppressAlert) alert('이미 청구세트 자동 생성이 진행 중입니다.');
+      return;
+    }
+
+    // [신규 정산 규칙 1. 금요일 확인]
+    // 오늘이 금요일(getDay() === 5)이 아니면 실행되지 않고 안내 창(Alert)을 띄우며 중단합니다.
+    const today = new Date();
+    if (today.getDay() !== 5) {
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      const todayDayName = dayNames[today.getDay()];
+      if (!suppressAlert) {
+        alert(`[청구세트 자동 생성 안내]\n\n청구세트 자동 생성은 금요일에만 실행할 수 있습니다.\n(현재: ${todayDayName}요일)\n\n매주 금요일에 다시 실행해주세요.`);
+      }
       return;
     }
 
@@ -3447,9 +3447,9 @@ function calculateDuePeriods3(startDateStr, endDateStr, isEnded, as) {
 
       if (!suppressAlert) {
         if (totalGeneratedSets > 0) {
-          alert(`[청구세트 자동 생성 완료]\n\n총 ${targetAppsCount}명의 현대해상 고객에게 ${totalGeneratedSets}개의 신규 청구세트가 정상 생성되어 DB에 저장되었습니다.\n(10일/20일/말일 및 간병종료일 기준)`);
+          alert(`[청구세트 자동 생성 완료]\n\n총 ${targetAppsCount}명의 현대해상 고객에게 ${totalGeneratedSets}개의 신규 청구세트가 정상 생성되어 DB에 저장되었습니다.\n(매주 금요일 정산 기준: 직전 토요일 ~ 오늘 금요일)`);
         } else {
-          alert('[청구세트 자동 생성 확인]\n\n모든 대상자의 10일·20일·말일 및 간병종료일 청구세트가 이미 최신 상태로 생성되어 있습니다.\n(중복 생성된 항목 없음)');
+          alert('[청구세트 자동 생성 확인]\n\n모든 대상자의 이번 주 금요일 정산 청구세트가 이미 최신 상태로 생성되어 있습니다.\n(중복 생성된 항목 없음)');
         }
       }
     } catch (err) {
