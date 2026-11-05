@@ -402,8 +402,6 @@
       return { claimStatus: isSending ? '바로빌 청구중...' : (isClaimDone ? '청구완료' : '청구전'), claimDate };
     };
 
-    // 목록 행은 claims 테이블 레코드만으로 생성한다. 신청 문서의
-    // customSettlementSets는 조회, 행 수, 표시값 계산에 사용하지 않는다.
     gHyundaiNewClaimOnlySets.clear();
     claimsByAppId.forEach((appClaims, appId) => {
       const app = appById.get(appId);
@@ -509,6 +507,94 @@
           depositAmount, depositDate: cSet.depositDate, depositStatus,
           payoutRound, payoutStandardDate: cSet.payoutStandardDate, payoutDate: cSet.payoutDate,
           payoutDays, cgDailyWage, payoutAmount, payoutStatus, memo: cSet.memo
+        });
+      });
+    });
+
+    apps.filter(app => app && app.id && isHyundaiApp(app)).forEach(app => {
+      const appId = String(app.id);
+      const appClaims = claimsByAppId.get(appId) || [];
+      const appAssigns = assigns.filter(a => a && String(a.applyId) === appId);
+      const appPayouts = payoutsByAppId.get(appId) || [];
+      const modalRounds = getModalSchedule(app, appId, appAssigns, appClaims, appPayouts);
+      const as = typeof window.getActiveCaregiverAssignment === 'function'
+        ? window.getActiveCaregiverAssignment(app, appAssigns)
+        : (appAssigns.find(a => a && (a.startDate || a.caregiverName)) || appAssigns[0] || null);
+
+      modalRounds.forEach((round, idx) => {
+        const setIndex = Number(round.setIndex || round.roundNumber) || (idx + 1);
+        const roundClaimId = round.existingClaim && String(round.existingClaim.id || '');
+        const standardDate = String(round.claimStandardDate || '').slice(0, 10).replace(/-/g, '.');
+        const alreadyListed = rows.some(row => String(row.appId) === appId && (
+          (roundClaimId && String(row.claimRecord && row.claimRecord.id || '') === roundClaimId) ||
+          Number(row.setIndex) === setIndex ||
+          (standardDate && String(row.claimStandardDate || '').slice(0, 10).replace(/-/g, '.') === standardDate)
+        ));
+        if (alreadyListed) return;
+
+        const customSet = (Array.isArray(app.customSettlementSets) ? app.customSettlementSets : [])
+          .find(set => Number(set.setIndex) === setIndex) || {};
+        const claim = round.existingClaim || null;
+        const payout = round.existingPayout || null;
+        const claimDays = Number(round.claimDays || round.days) || 1;
+        const payoutDays = Number(round.payoutDays || round.days) || claimDays;
+        const dailyClaimPrice = Number(round.dailyClaimPrice || customSet.dailyClaimPrice || app.customDailyClaimPrice) || 142000;
+        const claimAmount = Number(round.fullClaimAmount || round.ongoingClaimAmount || customSet.claimAmount) || claimDays * dailyClaimPrice;
+        const depositAmount = Number(round.depositAmount || customSet.depositAmount || claim && claim.depositAmount) || 0;
+        const cgDailyWage = Number(round.cgDailyWage || customSet.cgDailyWage || as && as.dailyWage) || 140000;
+        const payoutAmount = Number(round.fullPayoutAmount || round.ongoingPayoutAmount || customSet.payoutAmount) || payoutDays * cgDailyWage;
+        const claimDisplay = getModalClaimDisplay(app, round);
+        const claimRound = round.claimRoundLabel && round.claimRoundLabel !== '-'
+          ? round.claimRoundLabel
+          : (customSet.claimRound || round.label || `${setIndex}차`);
+        const payoutRound = round.payoutRoundLabel && round.payoutRoundLabel !== '-'
+          ? round.payoutRoundLabel
+          : (customSet.payoutRound || claimRound);
+        const depositStatus = isClaimDepositConfirmedNew(claim) || (claimAmount > 0 && depositAmount >= claimAmount)
+          ? '입금완료'
+          : (depositAmount > 0 ? '부분입금' : (customSet.depositStatus || '미입금'));
+        const payoutStatus = round.isPayoutPaid || (payout && ['지급', '지급완료'].includes(String(payout.payoutStatus || payout.status || '').trim()))
+          ? '지급완료'
+          : (customSet.payoutStatus || '지급전');
+        const cSet = {
+          ...customSet,
+          setIndex,
+          claimId: claim && claim.id || customSet.claimId || '',
+          payoutId: payout && payout.id || customSet.payoutId || '',
+          claimRound,
+          payoutRound,
+          claimStandardDate: standardDate || customSet.claimStandardDate || '',
+          claimDate: claimDisplay.claimDate || customSet.claimDate || '',
+          startDateStr: round.startDateStr || customSet.startDateStr || '',
+          endDateStr: round.endDateStr || customSet.endDateStr || '',
+          days: Number(round.days) || claimDays,
+          claimDays,
+          payoutDays,
+          dailyClaimPrice,
+          claimAmount,
+          claimStatus: claimDisplay.claimStatus,
+          depositAmount,
+          depositDate: claim && claim.depositDate || customSet.depositDate || '',
+          depositStatus,
+          payoutStandardDate: round.payoutStandardDate || customSet.payoutStandardDate || '',
+          payoutDate: round.payoutDate || customSet.payoutDate || '',
+          cgDailyWage,
+          payoutAmount,
+          payoutStatus,
+          caregiverName: round.caregiverName || (payout && payout.caregiverName) || as && as.caregiverName || app.caregiverName || app.assignedCaregiverName || '-',
+          memo: round.memo || customSet.memo || claim && claim.memo || payout && payout.memo || ''
+        };
+        gHyundaiNewClaimOnlySets.set(`${appId}_${setIndex}`, cSet);
+        rows.push({
+          appId, patientName: app.patientName || '무명', app, as, cSet, claimRecord: claim, setIndex,
+          caregiverName: cSet.caregiverName,
+          startDateStr: cSet.startDateStr, endDateStr: cSet.endDateStr,
+          days: cSet.days, claimRound, claimStandardDate: cSet.claimStandardDate,
+          claimDate: cSet.claimDate, claimDays, dailyClaimPrice, claimAmount,
+          claimStatus: cSet.claimStatus, depositAmount, depositDate: cSet.depositDate,
+          depositStatus, payoutRound, payoutStandardDate: cSet.payoutStandardDate,
+          payoutDate: cSet.payoutDate, payoutDays, cgDailyWage, payoutAmount,
+          payoutStatus, memo: cSet.memo
         });
       });
     });
@@ -867,7 +953,9 @@
         if (!visibleRowsByCustomerId.has(appId)) visibleRowsByCustomerId.set(appId, []);
       });
     }
-    const customerGroups = Array.from(visibleRowsByCustomerId.entries()).map(([appId, rows]) => {
+    const customerGroups = Array.from(visibleRowsByCustomerId.entries())
+      .sort(([appIdA], [appIdB]) => String(appIdB).localeCompare(String(appIdA), undefined, { numeric: true, sensitivity: 'base' }))
+      .map(([appId, rows]) => {
       const customerRows = allRowsByCustomerId.get(appId) || rows;
       const claimNeed = claimNeededByAppId.get(appId);
       const groupApp = customerRows[0]?.app || rows[0]?.app || claimNeed?.app || null;
@@ -980,7 +1068,7 @@
         <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
           <button type="button" onclick="window.deleteSelectedHyundaiClaims()" ${gHyundaiNewSelectedClaimIds.size ? '' : 'disabled'}
             class="px-3.5 py-2.5 rounded-xl ${gHyundaiNewSelectedClaimIds.size ? 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer' : 'bg-slate-100 text-slate-400 cursor-not-allowed'} text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs whitespace-nowrap"
-            title="선택한 청구 레코드만 삭제하고 연결된 신청서의 청구 정보도 정리합니다">
+            title="선택 세트의 claims, payouts, applications.customSettlementSets와 정산청구 faxRecords를 함께 삭제합니다">
             <i data-lucide="trash-2" class="w-4 h-4"></i>
             <span>선택 청구 삭제${gHyundaiNewSelectedClaimIds.size ? ` (${gHyundaiNewSelectedClaimIds.size})` : ''}</span>
           </button>
@@ -1289,9 +1377,9 @@
                 <td class="py-1.5 px-2 text-center">
                   <div class="flex flex-col items-center gap-1">
                     <div class="flex items-center justify-center gap-1">
-                      <label class="inline-flex items-center justify-center p-0 cursor-pointer" title="이 청구 레코드 선택">
-                        <input type="checkbox" ${gHyundaiNewSelectedClaimIds.has(String(row.claimRecord && row.claimRecord.id || '')) ? 'checked' : ''}
-                          onchange="window.toggleHyundaiNewClaimSelection('${escapeHtml(row.claimRecord && row.claimRecord.id || '')}', this.checked)"
+                      <label class="inline-flex items-center justify-center p-0 cursor-pointer" title="이 청구 세트와 연결된 청구·지급·정산청구 팩스 기록 선택">
+                        <input type="checkbox" ${gHyundaiNewSelectedClaimIds.has(`${row.appId}_${row.setIndex}`) ? 'checked' : ''}
+                          onchange="window.toggleHyundaiNewClaimSelection('${escapeHtml(row.appId)}', ${row.setIndex}, this.checked)"
                           class="w-3.5 h-3.5 accent-rose-600 cursor-pointer">
                       </label>
                       <button type="button"
@@ -1542,9 +1630,9 @@
     });
   }
 
-  function toggleHyundaiNewClaimSelection(claimId, isSelected) {
-    const id = String(claimId || '');
-    if (!id) return;
+  function toggleHyundaiNewClaimSelection(appId, setIndex, isSelected) {
+    const id = `${String(appId || '')}_${Number(setIndex)}`;
+    if (!String(appId || '') || !Number(setIndex)) return;
     const scrollX = window.scrollX || 0;
     const scrollY = window.scrollY || 0;
     const scrollableAncestors = [];
@@ -1581,96 +1669,224 @@
   }
 
   async function deleteSelectedHyundaiClaims() {
-    const selectedIds = Array.from(gHyundaiNewSelectedClaimIds);
-    const allClaims = Array.isArray(window.gClaims) ? window.gClaims : [];
-    const selectedClaims = allClaims.filter(claim => claim && selectedIds.includes(String(claim.id)));
-    if (!selectedClaims.length) {
+    const selectedKeys = new Set(gHyundaiNewSelectedClaimIds);
+    const selectedRows = getHyundaiClaimSets().filter(row => selectedKeys.has(`${row.appId}_${row.setIndex}`));
+    if (!selectedRows.length) {
       gHyundaiNewSelectedClaimIds.clear();
       renderHyundaiClaimHubNew();
       return;
     }
-
-    const claimSummary = selectedClaims.slice(0, 8).map(claim =>
-      `· ${claim.patientName || claim.applyId || '고객'} / ${claim.round || claim.id} / ${formatNumber(claim.claimAmount || 0)}원`
-    ).join('\n');
-    const extraCount = selectedClaims.length > 8 ? `\n외 ${selectedClaims.length - 8}건` : '';
-    const confirmed = window.confirm(
-      `[청구 레코드 삭제]\n\n${claimSummary}${extraCount}\n\n선택한 claims 레코드와 applications.customSettlementSets의 연결 청구 ID·일자·상태를 삭제합니다.\n신청서 자체와 간병비 지급 레코드는 삭제하지 않습니다. 계속하시겠습니까?`
-    );
-    if (!confirmed) return;
-
-    const deletedClaims = [];
-    const failedClaims = [];
-    for (const claim of selectedClaims) {
-      try {
-        if (typeof window.syncToConvex !== 'function') throw new Error('Convex 동기화 함수를 찾을 수 없습니다.');
-        const result = await window.syncToConvex('sync:deleteClaim', { claimId: String(claim.id) });
-        if (!result || result.status !== 'success') throw new Error('청구 레코드 삭제가 확인되지 않았습니다.');
-        deletedClaims.push(claim);
-      } catch (error) {
-        console.warn('[현대해상 청구 삭제 실패]', claim.id, error);
-        failedClaims.push(claim);
-      }
-    }
-
-    if (!deletedClaims.length) {
-      alert('청구 레코드를 삭제하지 못했습니다. 네트워크 상태를 확인하고 다시 시도해주세요.');
+    if (typeof window.syncToConvex !== 'function') {
+      alert('DB 삭제 동기화 함수를 찾을 수 없어 세트 삭제를 진행하지 않았습니다.');
       return;
     }
 
-    const deletedIds = new Set(deletedClaims.map(claim => String(claim.id)));
-    window.gClaims = allClaims.filter(claim => !claim || !deletedIds.has(String(claim.id)));
-    const affectedAppIds = new Set(deletedClaims.map(claim => String(claim.applyId || '')));
-    const apps = Array.isArray(window.gApps) ? window.gApps : [];
-    const updatedApps = [];
+    const claimSummary = selectedRows.slice(0, 8).map(row =>
+      `· ${row.patientName || row.appId || '고객'} / ${row.claimRound || `${row.setIndex}차`} / ${formatNumber(row.claimAmount || 0)}원`
+    ).join('\n');
+    const extraCount = selectedRows.length > 8 ? `\n외 ${selectedRows.length - 8}건` : '';
+    const confirmed = window.confirm(
+      `[청구 세트 삭제]\n\n${claimSummary}${extraCount}\n\n선택한 세트의 claims, 연결 payouts, applications.customSettlementSets 항목과 해당 차수의 정산청구 faxRecords를 함께 삭제합니다.\n고객 신청서와 다른 차수의 기록은 유지합니다. 계속하시겠습니까?`
+    );
+    if (!confirmed) return;
 
-    affectedAppIds.forEach(appId => {
-      const app = apps.find(item => item && String(item.id) === appId);
-      if (!app) return;
-      const removedAppClaims = deletedClaims.filter(claim => String(claim.applyId || '') === appId);
-      if (Array.isArray(app.customSettlementSets)) {
-        app.customSettlementSets = app.customSettlementSets.map(set => {
-          if (!set) return set;
-          const linkedClaim = removedAppClaims.find(claim => {
-            if (set.claimId) return String(set.claimId) === String(claim.id);
-            return Boolean(claim.round && set.claimRound && String(set.claimRound).trim() === String(claim.round).trim() &&
-              (!claim.standardDate || !set.claimStandardDate || String(set.claimStandardDate).slice(0, 10) === String(claim.standardDate).slice(0, 10)));
-          });
-          if (!linkedClaim) return set;
-          const nextSet = { ...set };
-          ['claimId', 'claimDate', 'claimStatus'].forEach(field => delete nextSet[field]);
-          return nextSet;
+    const deleteProgressOwner = `hyundaiClaimSetDelete_${Date.now()}`;
+    let deleteProgressVisible = false;
+    const updateDeleteProgress = (percent, statusText) => {
+      if (deleteProgressVisible && typeof window.updateGlobalProgress === 'function') {
+        window.updateGlobalProgress({
+          title: '청구 세트 삭제 중',
+          subtitle: '연결된 청구·지급·팩스 기록과 세트 정보를 정리하고 있습니다.',
+          percent,
+          statusText
         });
       }
-      const remainingClaims = window.gClaims.filter(claim => claim && String(claim.applyId || '') === appId);
-      app.claimCount = remainingClaims.length;
-      const isUnconfirmedClaim = claim => ![claim.depositStatus, claim.status, claim.adjusterStatus]
-        .some(status => ['수납완료', '입금완료'].includes(String(status || '').trim()));
-      app.unconfirmedClaimCount = remainingClaims.filter(isUnconfirmedClaim).length;
-      app.estimatedUnpaid = remainingClaims.filter(isUnconfirmedClaim)
-        .reduce((sum, claim) => sum + (Number(claim.unpaidAmount) || Number(claim.claimAmount) || 0), 0);
+    };
+    if (typeof window.showGlobalProgress === 'function' && window.gGlobalProgressOwner !== 'carelogPdf') {
+      window.showGlobalProgress({
+        owner: deleteProgressOwner,
+        title: '청구 세트 삭제 중',
+        subtitle: `${selectedRows.length}개 세트와 연결 기록을 정리하고 있습니다.`,
+        percent: 5,
+        statusText: '삭제할 청구·지급·팩스 기록을 확인하고 있습니다...',
+        icon: 'trash-2'
+      });
+      deleteProgressVisible = window.gGlobalProgressOwner === deleteProgressOwner;
+    }
+
+    try {
+    const claims = Array.isArray(window.gClaims) ? window.gClaims : [];
+    const payouts = Array.isArray(window.gPayouts) ? window.gPayouts : [];
+    const faxLogs = Array.isArray(window.gFaxLogs) ? window.gFaxLogs : [];
+    const apps = Array.isArray(window.gApps) ? window.gApps : [];
+    const deletedClaimIds = new Set();
+    const deletedPayoutIds = new Set();
+    const deletedFaxRecordIds = new Set();
+    const removedSetKeys = new Set();
+    const failedOperations = [];
+    const normalizeRound = value => String(value || '').trim().replace(/\s+/g, '');
+    const categoryIsSettlement = record => {
+      const category = String(record && record.category || '').trim();
+      const caseType = String(record && record.caseType || '').trim();
+      if (category) return category === '정산청구';
+      if (caseType) return caseType === '정산청구';
+      return String(record && record.caseTitle || '').includes('청구팩스');
+    };
+
+    let processedSetCount = 0;
+    for (const row of selectedRows) {
+      const appId = String(row.appId);
+      const setIndex = Number(row.setIndex);
+      updateDeleteProgress(10 + Math.round((processedSetCount / selectedRows.length) * 70),
+        `[${processedSetCount + 1}/${selectedRows.length}] ${row.patientName || appId} ${row.claimRound || `${setIndex}차`} 세트를 삭제하고 있습니다...`);
+      const app = apps.find(item => item && String(item.id) === appId);
+      if (!app) {
+        failedOperations.push(`${appId} 세트 ${setIndex}: 신청서를 찾지 못함`);
+        processedSetCount++;
+        continue;
+      }
+      if (!Array.isArray(app.customSettlementSets) || app.customSettlementSets.length === 0) {
+        const appClaims = claims.filter(claim => claim && String(claim.applyId) === appId);
+        const appAssigns = (window.gAssigns || []).filter(assignment => assignment && String(assignment.applyId) === appId);
+        const appPayouts = payouts.filter(payout => payout && String(payout.applyId) === appId);
+        const rounds = getModalSchedule(app, appId, appAssigns, appClaims, appPayouts);
+        app.customSettlementSets = rounds.map((round, index) => ({
+          setIndex: Number(round.setIndex || round.roundNumber) || index + 1,
+          claimRound: round.claimRoundLabel && round.claimRoundLabel !== '-' ? round.claimRoundLabel : (round.existingClaim && round.existingClaim.round || `${index + 1}차`),
+          payoutRound: round.payoutRoundLabel && round.payoutRoundLabel !== '-' ? round.payoutRoundLabel : (round.existingPayout && round.existingPayout.round || `${index + 1}차`),
+          claimStandardDate: round.claimStandardDate || '',
+          payoutStandardDate: round.payoutStandardDate || '',
+          claimDate: round.claimDate || '',
+          payoutDate: round.payoutDate || '',
+          startDateStr: round.startDateStr || '',
+          endDateStr: round.endDateStr || '',
+          days: round.days || 1,
+          claimDays: round.claimDays || round.days || 1,
+          payoutDays: round.payoutDays || round.days || 1,
+          dailyClaimPrice: round.dailyClaimPrice || 142000,
+          claimAmount: round.fullClaimAmount || 0,
+          claimStatus: (round.claimStatus === 'DEPOSIT_DONE' || round.isClaimDeposited) ? '입금완료' : ((round.isClaimSent || round.claimStatus === 'CLAIMED_UNPAID') ? '청구완료' : '청구전'),
+          depositAmount: round.depositAmount || 0,
+          depositDate: round.existingClaim && round.existingClaim.depositDate || '',
+          depositStatus: round.isClaimDeposited ? '입금완료' : (round.depositAmount > 0 ? '부분입금' : '미입금'),
+          cgDailyWage: round.cgDailyWage || 140000,
+          payoutAmount: round.fullPayoutAmount || 0,
+          payoutStatus: round.isPayoutPaid ? '지급완료' : '지급전',
+          claimId: round.existingClaim && round.existingClaim.id || '',
+          payoutId: round.existingPayout && round.existingPayout.id || '',
+          caregiverName: round.caregiverName || '',
+          memo: round.memo || ''
+        }));
+      }
+      const customSets = app.customSettlementSets;
+      const targetSet = customSets.find(set => Number(set.setIndex) === setIndex) || row.cSet || {};
+      const claimRound = String(targetSet.claimRound || row.claimRound || '').trim();
+      const payoutRound = String(targetSet.payoutRound || row.payoutRound || claimRound).trim();
+      const claimStandardDate = String(targetSet.claimStandardDate || row.claimStandardDate || '').slice(0, 10).replace(/-/g, '.');
+      const claimIdsForSet = new Set([String(targetSet.claimId || ''), String(row.claimRecord && row.claimRecord.id || '')].filter(Boolean));
+      const payoutIdsForSet = new Set([String(targetSet.payoutId || '')].filter(Boolean));
+      (claims || []).filter(claim => claim && String(claim.applyId) === appId).forEach(claim => {
+        const exactId = claimIdsForSet.has(String(claim.id));
+        const sameRound = claimRound && normalizeRound(claim.round) === normalizeRound(claimRound);
+        const sameDate = !claimStandardDate || !claim.standardDate || String(claim.standardDate).slice(0, 10).replace(/-/g, '.') === claimStandardDate;
+        if (exactId || (sameRound && sameDate)) {
+          claimIdsForSet.add(String(claim.id));
+          if (claim.payoutId) payoutIdsForSet.add(String(claim.payoutId));
+        }
+      });
+      (payouts || []).filter(payout => payout && String(payout.applyId) === appId).forEach(payout => {
+        const exactId = payoutIdsForSet.has(String(payout.id));
+        const sameRound = payoutRound && normalizeRound(payout.round) === normalizeRound(payoutRound);
+        if (exactId || sameRound) payoutIdsForSet.add(String(payout.id));
+      });
+      const faxRecordsForSet = faxLogs.filter(record => {
+        if (!record || String(record.appId) !== appId || !categoryIsSettlement(record)) return false;
+        const recordRound = Number(record.roundNumber);
+        if (Number.isFinite(recordRound) && recordRound > 0) return recordRound === setIndex;
+        return setIndex === 1 && (!claimStandardDate || !record.sentDate || String(record.sentDate).slice(0, 10).replace(/-/g, '.') === claimStandardDate);
+      });
+
+      for (const claimId of claimIdsForSet) {
+        if (!claimId || claimId.startsWith('Q') && !claims.some(claim => String(claim.id) === claimId)) continue;
+        try {
+          const result = await window.syncToConvex('sync:deleteClaim', { claimId });
+          if (!result || result.status !== 'success') throw new Error('claims 삭제 미확인');
+          deletedClaimIds.add(claimId);
+        } catch (error) { failedOperations.push(`${claimId}: ${error.message}`); }
+      }
+      for (const payoutId of payoutIdsForSet) {
+        if (!payoutId || payoutId.startsWith('P') && !payouts.some(payout => String(payout.id) === payoutId)) continue;
+        try {
+          const result = await window.syncToConvex('sync:deletePayout', { payoutId });
+          if (!result || result.status !== 'success') throw new Error('payouts 삭제 미확인');
+          deletedPayoutIds.add(payoutId);
+        } catch (error) { failedOperations.push(`${payoutId}: ${error.message}`); }
+      }
+      for (const record of faxRecordsForSet) {
+        if (!record.id) continue;
+        try {
+          const result = await window.syncToConvex('sync:deleteFaxRecord', { recordId: String(record.id) });
+          if (!result || result.status !== 'success') throw new Error('faxRecords 삭제 미확인');
+          deletedFaxRecordIds.add(String(record.id));
+        } catch (error) { failedOperations.push(`${record.id}: ${error.message}`); }
+      }
+
+      app.customSettlementSets = customSets.filter(set => Number(set.setIndex) !== setIndex);
+      app.claimCount = claims.filter(claim => claim && String(claim.applyId) === appId && !deletedClaimIds.has(String(claim.id))).length;
+      const remainingClaims = claims.filter(claim => claim && String(claim.applyId) === appId && !deletedClaimIds.has(String(claim.id)));
+      const unconfirmedClaims = remainingClaims.filter(claim => ![claim.depositStatus, claim.status, claim.adjusterStatus]
+        .some(status => ['수납완료', '입금완료'].includes(String(status || '').trim())));
+      app.unconfirmedClaimCount = unconfirmedClaims.length;
+      app.estimatedUnpaid = unconfirmedClaims.reduce((sum, claim) => sum + (Number(claim.unpaidAmount) || Number(claim.claimAmount) || 0), 0);
+      app.totalPayout = payouts.filter(payout => payout && String(payout.applyId) === appId && !deletedPayoutIds.has(String(payout.id)) &&
+        ['지급완료', '지급'].includes(String(payout.payoutStatus || payout.status || '').trim()))
+        .reduce((sum, payout) => sum + (Number(payout.payoutAmount) || 0), 0);
       app.hasManualUpdate = true;
       app.updatedAt = new Date().toISOString();
-      updatedApps.push(app);
-    });
-
-    deletedIds.forEach(id => gHyundaiNewSelectedClaimIds.delete(id));
-    try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(window.gClaims)); } catch (error) { console.warn(error); }
-    await Promise.all(updatedApps.map(async app => {
+      removedSetKeys.add(`${appId}_${setIndex}`);
       try {
         const result = await window.syncToConvex('sync:saveApplication', { app });
-        if (!result || result.status !== 'success') throw new Error('신청서 청구 정보 저장이 확인되지 않았습니다.');
-      } catch (error) {
-        console.warn('[현대해상 신청서 청구 정보 정리 실패]', app.id, error);
-        failedClaims.push(...deletedClaims.filter(claim => String(claim.applyId || '') === String(app.id)));
-      }
-    }));
+        if (!result || result.status !== 'success') throw new Error('신청서 세트 정보 저장 미확인');
+      } catch (error) { failedOperations.push(`${appId}: ${error.message}`); }
+      try {
+        const response = await fetch('/api/hub/customer/update-fields', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appId, fields: {
+            customSettlementSets: app.customSettlementSets, claimCount: app.claimCount,
+            unconfirmedClaimCount: app.unconfirmedClaimCount, estimatedUnpaid: app.estimatedUnpaid,
+            totalPayout: app.totalPayout, hasManualUpdate: true
+          } })
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      } catch (error) { failedOperations.push(`${appId}: 신청서 백업 저장 실패`); }
+      processedSetCount++;
+    }
 
+    updateDeleteProgress(88, '삭제 결과를 로컬 데이터와 화면에 반영하고 있습니다...');
+    window.gClaims = claims.filter(claim => !claim || !deletedClaimIds.has(String(claim.id)));
+    window.gPayouts = payouts.filter(payout => !payout || !deletedPayoutIds.has(String(payout.id)));
+    window.gFaxLogs = faxLogs.filter(record => !record || !deletedFaxRecordIds.has(String(record.id)));
+    removedSetKeys.forEach(key => gHyundaiNewSelectedClaimIds.delete(key));
+    try {
+      localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(window.gClaims));
+      localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(window.gPayouts));
+    } catch (error) { console.warn('[현대해상 세트 삭제 캐시 저장 실패]', error); }
+    if (typeof window.saveFaxLogs === 'function') window.saveFaxLogs();
+    else if (typeof saveFaxLogs === 'function') saveFaxLogs();
     renderHyundaiClaimHubNew();
-    const message = failedClaims.length
-      ? `${deletedClaims.length}건을 삭제했습니다. ${failedClaims.length}건은 서버 저장 결과를 확인할 수 없어 새로고침 후 확인해주세요.`
-      : `${deletedClaims.length}건의 청구 레코드를 삭제했습니다. 신청서와 지급 레코드는 유지했습니다.`;
-    alert(message);
+    updateDeleteProgress(100, '세트 삭제 처리가 완료되었습니다.');
+    const removedCount = removedSetKeys.size;
+    alert(failedOperations.length
+      ? `${removedCount}개 세트를 목록에서 정리했습니다. 일부 서버 삭제/저장이 확인되지 않았습니다. 새로고침 후 claims, payouts, faxRecords와 세트 정보를 확인해주세요.\n\n${failedOperations.slice(0, 5).join('\n')}`
+      : `${removedCount}개 세트와 연결된 청구·지급·정산청구 팩스 기록을 삭제했습니다.`);
+    } catch (error) {
+      console.error('[현대해상 세트 삭제 실패]', error);
+      alert('청구 세트 삭제 처리 중 오류가 발생했습니다. 새로고침 후 데이터 상태를 확인해주세요.');
+    } finally {
+      if (deleteProgressVisible && typeof window.hideGlobalProgress === 'function') {
+        window.hideGlobalProgress(250, deleteProgressOwner);
+      }
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -1706,11 +1922,11 @@
     const claim = (row && row.claimRecord) || (window.gClaims || []).find(item => item &&
       ((cSet && cSet.claimId && String(item.id) === String(cSet.claimId)) ||
        (String(item.applyId) === String(appId) && cSet && String(item.round || '').trim() === String(cSet.claimRound || '').trim())));
-    if (!app || !cSet || !claim) {
+    if (!app || !cSet) {
       if (selectEl && row) selectEl.value = row.claimStatus || '청구전';
       return;
     }
-    const currentStatus = String(row && row.claimStatus || cSet.claimStatus || claim.adjusterStatus || claim.status || '청구전').trim();
+    const currentStatus = String(row && row.claimStatus || cSet.claimStatus || (claim && (claim.adjusterStatus || claim.status)) || '청구전').trim();
 
     if (['입금완료', '수납완료'].includes(currentStatus) ||
         ['입금완료', '수납완료'].includes(String(cSet.depositStatus || '').trim()) ||
@@ -1724,6 +1940,38 @@
 
     if (currentStatus !== '청구완료') {
       if (typeof window.openManualFaxClaimModal === 'function') {
+        if (!Array.isArray(app.customSettlementSets) || app.customSettlementSets.length === 0) {
+          const appClaims = (window.gClaims || []).filter(item => item && String(item.applyId) === String(appId));
+          const appPayouts = (window.gPayouts || []).filter(item => item && String(item.applyId) === String(appId));
+          const appAssigns = (window.gAssigns || []).filter(item => item && String(item.applyId) === String(appId));
+          const activeAssignment = typeof window.getActiveCaregiverAssignment === 'function'
+            ? window.getActiveCaregiverAssignment(app, appAssigns)
+            : appAssigns[0] || null;
+          const progress = activeAssignment && typeof window.getCareProgressInfo === 'function'
+            ? window.getCareProgressInfo(activeAssignment)
+            : null;
+          const schedule = typeof window.calculateCareSettlementSchedule === 'function'
+            ? window.calculateCareSettlementSchedule(app, activeAssignment, progress, appClaims, appPayouts)
+            : null;
+          app.customSettlementSets = (schedule && Array.isArray(schedule.rounds) ? schedule.rounds : []).map((round, index) => ({
+            setIndex: Number(round.setIndex || round.roundNumber) || index + 1,
+            claimRound: round.claimRoundLabel && round.claimRoundLabel !== '-' ? round.claimRoundLabel : (round.existingClaim && round.existingClaim.round || `${index + 1}차`),
+            payoutRound: round.payoutRoundLabel && round.payoutRoundLabel !== '-' ? round.payoutRoundLabel : (round.existingPayout && round.existingPayout.round || `${index + 1}차`),
+            claimStandardDate: round.claimStandardDate || '', payoutStandardDate: round.payoutStandardDate || '',
+            claimDate: round.claimDate || '', payoutDate: round.payoutDate || '',
+            startDateStr: round.startDateStr || '', endDateStr: round.endDateStr || '',
+            days: round.days || 1, claimDays: round.claimDays || round.days || 1, payoutDays: round.payoutDays || round.days || 1,
+            dailyClaimPrice: round.dailyClaimPrice || 142000, claimAmount: round.fullClaimAmount || 0,
+            claimStatus: (round.claimStatus === 'DEPOSIT_DONE' || round.isClaimDeposited) ? '입금완료' : ((round.isClaimSent || round.claimStatus === 'CLAIMED_UNPAID') ? '청구완료' : '청구전'),
+            depositAmount: round.depositAmount || 0, depositDate: round.existingClaim && round.existingClaim.depositDate || '',
+            depositStatus: round.isClaimDeposited ? '입금완료' : (round.depositAmount > 0 ? '부분입금' : '미입금'),
+            cgDailyWage: round.cgDailyWage || 140000, payoutAmount: round.fullPayoutAmount || 0,
+            payoutStatus: round.isPayoutPaid ? '지급완료' : '지급전',
+            claimId: round.existingClaim && round.existingClaim.id || '',
+            payoutId: round.existingPayout && round.existingPayout.id || '',
+            caregiverName: round.caregiverName || '', memo: round.memo || ''
+          }));
+        }
         window.openManualFaxClaimModal(appId, Number(setIndex));
         if (selectEl) selectEl.value = currentStatus;
       } else {
@@ -1733,8 +1981,8 @@
       return;
     }
 
-    const claimAmount = Number(claim.claimAmount || cSet.claimAmount) || 0;
-    const confirmText = `[${app.patientName || '고객'}] ${cSet.claimRound || claim.round || `${setIndex}차`} 청구를 취소하고 청구전으로 원복할까요?\n\n청구번호: ${claim.id || cSet.claimId || '-'}\n청구금액: ${formatNumber(claimAmount)}원\n\n청구완료 일시와 발송 표시를 지우고 청구 상태를 청구전으로 되돌립니다.`;
+    const claimAmount = Number((claim && claim.claimAmount) || cSet.claimAmount) || 0;
+    const confirmText = `[${app.patientName || '고객'}] ${cSet.claimRound || (claim && claim.round) || `${setIndex}차`} 청구를 취소하고 청구전으로 원복할까요?\n\n청구번호: ${(claim && claim.id) || cSet.claimId || '-'}\n청구금액: ${formatNumber(claimAmount)}원\n\n청구완료 일시와 발송 표시를 지우고 청구 상태를 청구전으로 되돌립니다.`;
     const confirmed = typeof window.showCustomConfirm === 'function'
       ? await window.showCustomConfirm(confirmText, {
           theme: 'fax', icon: 'rotate-ccw', title: '청구 취소(원복)',
@@ -1746,18 +1994,63 @@
       return;
     }
 
-    // 상세의 청구취소(원복)처럼 날짜/발송표시를 되돌리되, 목록은 claims 레코드로 행을
-    // 구성하므로 레코드는 유지하고 상태를 청구전으로 바꾼다.
-    claim.status = '청구전';
-    claim.adjusterStatus = '청구전';
-    delete claim.claimDate;
-    delete claim.faxStatus;
-    delete claim.faxSentDate;
-    claim.updatedAt = new Date().toISOString();
+    // claims 레코드가 있으면 상세처럼 상태를 원복한다. 레코드가 없으면
+    // 청구완료 근거인 해당 차수의 정산청구 팩스 기록을 제거한다.
+    if (claim) {
+      claim.status = '청구전';
+      claim.adjusterStatus = '청구전';
+      delete claim.claimDate;
+      delete claim.faxStatus;
+      delete claim.faxSentDate;
+      claim.updatedAt = new Date().toISOString();
+    }
     cSet.claimStatus = '청구전';
     delete cSet.claimDate;
     delete cSet.faxStatus;
     delete cSet.faxSentDate;
+    const appSetTarget = Array.isArray(app.customSettlementSets)
+      ? app.customSettlementSets.find(item => Number(item.setIndex) === Number(setIndex))
+      : null;
+    if (appSetTarget) {
+      appSetTarget.claimStatus = '청구전';
+      delete appSetTarget.claimDate;
+      delete appSetTarget.faxStatus;
+      delete appSetTarget.faxSentDate;
+    }
+    const settlementFaxLogs = (window.gFaxLogs || []).filter(record => {
+      if (!record || String(record.appId) !== String(appId)) return false;
+      const category = String(record.category || '').trim();
+      const caseType = String(record.caseType || '').trim();
+      const isSettlementFax = category ? category === '정산청구' :
+        (caseType ? caseType === '정산청구' : String(record.caseTitle || '').includes('청구팩스'));
+      if (!isSettlementFax) return false;
+      const recordRound = Number(record.roundNumber);
+      if (Number.isFinite(recordRound) && recordRound > 0) return recordRound === Number(setIndex);
+      return Number(setIndex) === 1;
+    });
+    if (!claim) {
+      if (settlementFaxLogs.length && typeof window.syncToConvex !== 'function') {
+        if (selectEl) selectEl.value = currentStatus;
+        alert('팩스 기록 삭제 동기화 함수를 찾을 수 없어 청구 상태를 원복하지 않았습니다.');
+        return;
+      }
+      const deletedFaxIds = new Set();
+      for (const record of settlementFaxLogs) {
+        if (!record.id) continue;
+        try {
+          const faxResult = await window.syncToConvex('sync:deleteFaxRecord', { recordId: String(record.id) });
+          if (!faxResult || faxResult.status !== 'success') throw new Error('정산청구 팩스 기록 삭제 미확인');
+          deletedFaxIds.add(String(record.id));
+        } catch (error) {
+          console.warn('[현대해상 청구 팩스 원복 실패]', record.id, error);
+          if (selectEl) selectEl.value = currentStatus;
+          alert('정산청구 팩스 기록을 삭제하지 못해 상태를 원복하지 않았습니다. 새로고침 후 다시 시도해주세요.');
+          return;
+        }
+      }
+      window.gFaxLogs = (window.gFaxLogs || []).filter(record => !record || !deletedFaxIds.has(String(record.id)));
+      if (typeof saveFaxLogs === 'function') saveFaxLogs();
+    }
     try {
       localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(window.gClaims || []));
       localStorage.setItem('LIVON_CLAIMS', JSON.stringify(window.gClaims || []));
@@ -1780,8 +2073,10 @@
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       if (typeof window.syncToConvex === 'function') {
-        const claimResult = await window.syncToConvex('sync:saveClaim', { claim });
-        if (!claimResult || claimResult.status !== 'success') throw new Error('청구 레코드 저장이 확인되지 않았습니다.');
+        if (claim) {
+          const claimResult = await window.syncToConvex('sync:saveClaim', { claim });
+          if (!claimResult || claimResult.status !== 'success') throw new Error('청구 레코드 저장이 확인되지 않았습니다.');
+        }
         const result = await window.syncToConvex('sync:saveApplication', { app });
         if (!result || result.status !== 'success') throw new Error('신청서 저장이 확인되지 않았습니다.');
       }
@@ -1792,7 +2087,7 @@
 
     renderHyundaiClaimHubNew();
     if (typeof window.showNotification === 'function') {
-      window.showNotification({ type: 'success', title: '청구 취소(원복) 완료', message: `${cSet.claimRound || claim.round || `${setIndex}차`} 청구 상태를 청구전으로 변경했습니다.` });
+      window.showNotification({ type: 'success', title: '청구 취소(원복) 완료', message: `${cSet.claimRound || (claim && claim.round) || `${setIndex}차`} 청구 상태를 청구전으로 변경했습니다.` });
     }
   }
 
