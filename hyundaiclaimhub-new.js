@@ -895,6 +895,7 @@
       return {
         appId,
         patientName: rows[0]?.patientName || customerRows[0]?.patientName || claimNeed?.app.patientName || '무명',
+        isScor: String(groupApp?.insuranceCompany || customerRows.find(row => row.app?.insuranceCompany)?.app?.insuranceCompany || claimNeed?.app?.insuranceCompany || '').toUpperCase().includes('SCOR'),
         carePeriodLabel,
         rows,
         allRows: customerRows,
@@ -928,6 +929,7 @@
                     <i data-lucide="${expanded ? 'chevron-down' : 'chevron-right'}" class="w-4 h-4 text-amber-700 shrink-0"></i>
                     <span class="font-mono font-black text-slate-800 text-xs px-2 py-1 rounded-lg bg-slate-100 border border-slate-200">${escapeHtml(group.appId)}</span>
                     <span class="font-black text-slate-900 text-sm truncate">${escapeHtml(group.patientName)}</span>
+                    ${group.isScor ? '<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-violet-100 text-violet-800 border border-violet-300">SCOR</span>' : ''}
                     <span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-800 border border-sky-200">간병기간: ${escapeHtml(group.carePeriodLabel)}</span>
                     ${group.claimNeeded ? `<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300" title="${escapeHtml(group.claimNeededThrough)}까지 청구요청이 확인되지 않은 간병 기간이 있습니다">청구필요</span>` : ''}
                     <span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">${totalCount ? `검색 결과 ${visibleCount}/${totalCount}세트` : '등록된 청구세트 없음'}</span>
