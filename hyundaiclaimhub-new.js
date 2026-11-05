@@ -1545,9 +1545,34 @@
   function toggleHyundaiNewClaimSelection(claimId, isSelected) {
     const id = String(claimId || '');
     if (!id) return;
+    const scrollX = window.scrollX || 0;
+    const scrollY = window.scrollY || 0;
+    const scrollableAncestors = [];
+    let ancestor = document.getElementById('tab-hyundaiclaimhubnew');
+    while (ancestor) {
+      const style = window.getComputedStyle ? window.getComputedStyle(ancestor) : null;
+      if (ancestor.scrollHeight > ancestor.clientHeight + 1 && style && /(auto|scroll)/.test(`${style.overflowY} ${style.overflow}`)) {
+        scrollableAncestors.push({ element: ancestor, top: ancestor.scrollTop, left: ancestor.scrollLeft });
+      }
+      ancestor = ancestor.parentElement;
+    }
+    const tableScroller = document.getElementById('hyundaiClaimNewTableScroller');
+    const tableScroll = tableScroller ? { top: tableScroller.scrollTop, left: tableScroller.scrollLeft } : null;
     if (isSelected) gHyundaiNewSelectedClaimIds.add(id);
     else gHyundaiNewSelectedClaimIds.delete(id);
     renderHyundaiClaimHubNew();
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+      scrollableAncestors.forEach(({ element, top, left }) => {
+        element.scrollTop = top;
+        element.scrollLeft = left;
+      });
+      const nextTableScroller = document.getElementById('hyundaiClaimNewTableScroller');
+      if (nextTableScroller && tableScroll) {
+        nextTableScroller.scrollTop = tableScroll.top;
+        nextTableScroller.scrollLeft = tableScroll.left;
+      }
+    });
   }
 
   function clearHyundaiNewClaimSelection() {
@@ -3164,6 +3189,7 @@ function calculateDuePeriods3(startDateStr, endDateStr, isEnded, as) {
 
   // 인라인 수정 핸들러 글로벌 노출
   window.handleHyundaiNewDateTimeChange = handleHyundaiNewDateTimeChange;
+  window.handleHyundaiNewClaimStatusAction = handleHyundaiNewClaimStatusAction;
   window.handleHyundaiNewStatusChange = handleHyundaiNewStatusChange;
   window.handleHyundaiNewCellEdit = handleHyundaiNewCellEdit;
 
