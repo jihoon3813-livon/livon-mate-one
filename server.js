@@ -3429,6 +3429,7 @@ function appendServerAuditLog(logItem) {
       }
     }
 
+
     if (reqPath === '/api/slack/history' && req.method === 'GET') {
       const slackService = require('./slack-report-service');
       try {
@@ -3450,6 +3451,35 @@ function appendServerAuditLog(logItem) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         return res.end(JSON.stringify({ success: false, error: e.message }));
       }
+    }
+    
+  
+      
+      
+    if (reqPath === '/api/careport/caregiver') {
+      const caregiverHandler = require('./api/careport/caregiver');
+      req.query = parsedUrl.query;
+      res.status = (code) => ({
+        json: (data) => {
+          if (!res.headersSent) res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        },
+        end: () => {
+          if (!res.headersSent) res.writeHead(code);
+          res.end();
+        }
+      });
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+          try { req.body = JSON.parse(body || '{}'); } catch (e) { req.body = body; }
+          caregiverHandler(req, res);
+        });
+        return;
+      }
+      return caregiverHandler(req, res);
     }
 
     // CarePort Embed & Assets Proxy for authentic in-browser rendering

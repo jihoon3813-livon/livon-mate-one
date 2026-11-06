@@ -33065,7 +33065,18 @@ async function submitActiveHubCustomerToCarePort() {
     : `[${pName} 님 - ${ins}]\n고객 정보를 케어포트(방문관리 > 서비스신청)에 최신 데이터로 정식 등록하시겠습니까?\n\n[최신 반영 데이터 검증]\n• 피보험자: ${pName} (${enrichedApp.phone || '-'})\n• 간병일정: ${dateDisplay} (${latestDays}일간)\n• 병원/장소: ${locDisplay}\n• 보호자(신청인): ${latestApplicantName || '본인'} (${latestApplicantPhone || '-'})\n\n* 고객 정보가 케어포트 전산에 실시간 전송됩니다.`;
 
   if (confirm(confirmMsg)) {
-    await submitAppToCarePort(enrichedApp, true);
+    const submitResult = await submitAppToCarePort(enrichedApp, true);
+    if (!submitResult || !submitResult.success) return;
+    if (!latestAssign || !String(latestAssign.caregiverName || '').trim() || !String(latestAssign.phone || '').replace(/\D/g, '')) {
+      return;
+    }
+
+    try {
+      await requestCarePortAssignmentAfterConvexSave(latestAssign, enrichedApp);
+    } catch (error) {
+      console.warn('[CarePort caregiver registration] 후속 연동 실패:', error);
+   //   alert(`간병인 케어포트 등록 처리 중 오류가 발생했습니다.\n${error.message}`);
+    }
   }
 }
 
@@ -33155,6 +33166,76 @@ function openNewAssignModal(targetApplyId = null, isReplacement = false) {
 
   openModal('newAssignModal');
   initIcons();
+}
+
+const CAREPORT_ASSIGNMENT_PHONE_CHECK_URL = '/api/careport/caregiver?operation=check-phone';
+const CAREPORT_ASSIGNMENT_REGISTER_URL = '/api/careport/caregiver?operation=register-caregiver';
+
+async function requestCarePortAssignmentAfterConvexSave(assignment, application) {
+  const phone = String(assignment && assignment.phone || '').replace(/\D/g, '');
+  if (!phone) return { skipped: true, reason: 'missing-phone' };
+
+  const checkResponse = await fetch(CAREPORT_ASSIGNMENT_PHONE_CHECK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, name: null })
+  });
+  if (!checkResponse.ok) throw new Error(`CarePort 전화번호 확인 실패 (${checkResponse.status})`);
+  const phoneCheckResult = await checkResponse.json();
+  const existingCaregivers = Array.isArray(phoneCheckResult)
+    ? phoneCheckResult
+    : (Array.isArray(phoneCheckResult && phoneCheckResult.data) ? phoneCheckResult.data : []);
+  const company = String(application && application.insuranceCompany || '').trim();
+  const normalizedCompany = company.replace(/\s/g, '');
+  const groupIds = normalizedCompany.includes('SCOR')
+    ? { familyGroups: 161580191, familyMainGroups: 161580347 }
+    : (normalizedCompany.includes('삼성화재')
+      ? { familyGroups: 161580424, familyMainGroups: 161580423 }
+      : (normalizedCompany.includes('현대해상')
+        ? { familyGroups: 161580188, familyMainGroups: 161580187 }
+        : null));
+  if (!groupIds) throw new Error(`CarePort 그룹 설정을 찾을 수 없습니다: ${company || '(보험사 미지정)'}`);
+
+  if (existingCaregivers.length) {
+    const expectedGroup = normalizedCompany.includes('SCOR')
+      ? '영등포센터'
+      : (normalizedCompany.includes('삼성화재') ? '삼성화재' : '현대해상');
+    const existing = existingCaregivers[0];
+    const existingGroup = String(existing && existing.groupName || '').trim();
+    if (existingGroup === expectedGroup) {
+      return { registered: true, sameGroup: true, caregiver: existing };
+    }
+    alert(`간병인 배정은 성공했으나 케어포트 ${existingGroup || '기존 그룹'}에 이미 가입되어있는 간병인입니다 개발팀에 문의하세요`);
+    return { registered: true, sameGroup: false, caregiver: existing };
+  }
+
+  const caregiverName = String(assignment && assignment.caregiverName || '').trim();
+  if (!caregiverName) throw new Error('CarePort 간병인 등록 실패: 이름이 없습니다.');
+  const registerPayload = {
+    login_pw: '123456789',
+    user_name: caregiverName,
+    jumin: '000101',
+    sex: '2',
+    mobile: phone,
+    tel: phone,
+    zip: '08592',
+    address_basic: '서울 금천구 가산디지털2로 34',
+    address_detail: '',
+    care_auth_group: 'CP_107',
+    familyMainGroups: groupIds.familyMainGroups,
+    consultant_role: '간병인',
+    familyGroups: groupIds.familyGroups,
+    mtype: 5,
+    status: 'NEW'
+  };
+  const registerResponse = await fetch(CAREPORT_ASSIGNMENT_REGISTER_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(registerPayload)
+  });
+  if (!registerResponse.ok) throw new Error(`CarePort 간병인 등록 실패 (${registerResponse.status})`);
+  const registerResult = await registerResponse.json().catch(() => null);
+  return { registered: true, sameGroup: false, registerResult };
 }
 
 function handleNewAssignSubmit(e) {
@@ -33298,7 +33379,13 @@ function handleNewAssignSubmit(e) {
 
   // Convex Cloud 운영 DB 실시간 동기화
   if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:saveAssignment', { assign: newAssign });
+    syncToConvex('sync:saveAssignment', { assign: newAssign })
+      .then(result => {
+        
+        if (!result || result.status === 'error') return null;
+        return requestCarePortAssignmentAfterConvexSave(newAssign, app);
+      })
+      .catch(error => console.warn('[CarePort assignment] 후속 연동 실패:', error));
     if (app) syncToConvex('sync:saveApplication', { app: app });
   }
 
