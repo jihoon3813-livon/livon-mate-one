@@ -8968,13 +8968,14 @@ function renderCurrentSamsungSheet() {
 
             const st = getStickyInfo(col.key, false, isSelected, displayIdx, hasPending);
             const extraStyle = st.isSticky ? st.style : `min-width: ${col.width}; width: ${col.width};`;
+            const isYesNoStatus = col.key === 'surgeryStatus' || col.key === 'readmissionStatus';
+            const statusValue = isYesNoStatus
+              ? (gSamsungPendingChanges.get(changeKey)?.newVal || normalizeSamsungSheetYesNoStatus(col.key, rawVal) || 'N')
+              : '';
             const cellBg = hasPending ? 'bg-amber-100/90 font-semibold text-amber-950 ring-1 ring-amber-400' : (st.isSticky ? st.bg : (isSelected ? 'bg-sky-50/70' : ''));
             const cellText = (col.key === 'patientName') ? 'font-bold text-slate-900' : 'text-slate-800';
-            const isYesNoStatus = col.key === 'surgeryStatus' || col.key === 'readmissionStatus';
-            const pendingStatus = gSamsungPendingChanges.get(`${gActiveSamsungSheet}_${realIdx}_${col.key}`)?.newVal;
-            const statusValue = pendingStatus || normalizeSamsungSheetYesNoStatus(col.key, rawVal) || 'N';
             const cellContent = isYesNoStatus
-              ? `<select aria-label="${col.label}" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="onSamsungYesNoStatusChange(this, '${gActiveSamsungSheet}', ${realIdx}, '${col.key}')" class="rounded-md border border-slate-300 bg-white px-1.5 py-1 text-xs font-bold text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"><option value="N" ${statusValue === 'N' ? 'selected' : ''}>N</option><option value="Y" ${statusValue === 'Y' ? 'selected' : ''}>Y</option></select>`
+              ? `<select aria-label="${col.label}" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="onSamsungYesNoStatusChange(this, '${gActiveSamsungSheet}', ${realIdx}, '${col.key}')" class="rounded-md border border-slate-300 bg-white px-1.5 py-1 text-xs font-bold focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${statusValue === 'Y' ? 'text-emerald-700' : 'text-slate-800'}"><option value="N" ${statusValue === 'N' ? 'selected' : ''}>N</option><option value="Y" ${statusValue === 'Y' ? 'selected' : ''}>Y</option></select>`
               : displayVal;
 
             return `
@@ -9183,8 +9184,12 @@ function onSamsungYesNoStatusChange(select, sheetKey, rowIdx, colKey) {
   const changeKey = `${sheetKey}_${rowIdx}_${colKey}`;
   const origVal = normalizeSamsungSheetYesNoStatus(colKey, row[colKey]) || 'N';
   const cell = select.closest('td');
+  const hasPending = newVal !== origVal;
 
-  if (newVal !== origVal) {
+  select.classList.toggle('text-emerald-700', newVal === 'Y');
+  select.classList.toggle('text-slate-800', newVal !== 'Y');
+
+  if (hasPending) {
     gSamsungPendingChanges.set(changeKey, { sheetKey, rowIdx, colKey, newVal, origVal });
     cell?.classList.add('bg-amber-100/90', 'font-semibold', 'text-amber-950', 'ring-1', 'ring-amber-400');
     if (cell) cell.title = `수정됨 (기존: ${origVal}) - [수정사항 저장] 클릭 시 최종 반영`;
