@@ -25,19 +25,6 @@
   var gSaveInProgress = new Set(); // 중복 저장 방지 추적용 (key: `${appId}_${setIndex}`)
 
   var gHyundaiNewServerFetching = false;
-  var gHyundaiNewConvexClient = null;
-  var gHyundaiNewSnapshotUnsubscribe = null;
-  var gHyundaiNewSubscriptionPromise = null;
-  var gHyundaiNewFallbackRefreshPromise = null;
-  var gHyundaiNewSubscriptionUrl = '';
-  var gHyundaiNewSubscriptionGeneration = 0;
-  var gHyundaiNewSubscriptionReady = false;
-  var gHyundaiNewInitialSubscriptionResolve = null;
-  var gHyundaiNewVisibilityHandler = null;
-  var gHyundaiNewTabObserver = null;
-  var gHyundaiNewModalObserver = null;
-  var gHyundaiNewModalWasOpen = false;
-  var gHyundaiNewPendingSnapshot = null;
   var gHyundaiNewSnapshotLoaded = false;
 
   // -----------------------------------------------------------------------
@@ -618,224 +605,16 @@
     return rows;
   }
 
-  function isHyundaiNewPageActive() {
-    const container = document.getElementById('tab-hyundaiclaimhubnew');
-    const selectedTab = typeof window.gActiveTab === 'undefined' || window.gActiveTab === 'hyundaiclaimhubnew';
-    return !document.hidden && selectedTab && !!container &&
-      !container.classList.contains('hidden') && container.style.display !== 'none';
-  }
-
-  function stopHyundaiNewSubscription() {
-    gHyundaiNewSubscriptionGeneration++;
-    if (gHyundaiNewSnapshotUnsubscribe) {
-      try { gHyundaiNewSnapshotUnsubscribe(); } catch (e) {}
-      gHyundaiNewSnapshotUnsubscribe = null;
-    }
-    if (gHyundaiNewConvexClient) {
-      try { gHyundaiNewConvexClient.close(); } catch (e) {}
-      gHyundaiNewConvexClient = null;
-    }
-    gHyundaiNewSubscriptionUrl = '';
-    gHyundaiNewSubscriptionReady = false;
-    gHyundaiNewSubscriptionPromise = null;
-    if (gHyundaiNewInitialSubscriptionResolve) {
-      gHyundaiNewInitialSubscriptionResolve(false);
-      gHyundaiNewInitialSubscriptionResolve = null;
-    }
-  }
-
-  function applyHyundaiNewSnapshot(snapshot) {
-    if (!snapshot || snapshot.status !== 'success' ||
-        !Array.isArray(snapshot.applications) || !Array.isArray(snapshot.assignments) ||
-        !Array.isArray(snapshot.claims) || !Array.isArray(snapshot.payouts)) return false;
-
-    let deletedAppIds = new Set();
-    let recentlyRegisteredIds = new Set();
-    let outboxApps = [];
-    try { deletedAppIds = new Set(JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]').map(String)); } catch (e) {}
-    try { recentlyRegisteredIds = new Set(JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]').map(String)); } catch (e) {}
-    try {
-      const parsed = JSON.parse(localStorage.getItem('LIVON_PENDING_OUTBOX_APPS') || '[]');
-      if (Array.isArray(parsed)) outboxApps = parsed;
-    } catch (e) {}
-
-    let serverApps = snapshot.applications.filter(app => app && app.id && !deletedAppIds.has(String(app.id)));
-    if (typeof window.filterInvalidSamsungDuplicates === 'function') {
-      serverApps = window.filterInvalidSamsungDuplicates(serverApps);
-    }
-    const serverIds = new Set(serverApps.map(app => String(app.id)));
-    const localPendingApps = (Array.isArray(window.gApps) ? window.gApps : []).filter(app => app && app.id &&
-      !deletedAppIds.has(String(app.id)) && !serverIds.has(String(app.id)) &&
-      (app._isJustRegistered === true || recentlyRegisteredIds.has(String(app.id))));
-    outboxApps.forEach(app => {
-      if (app && app.id && !deletedAppIds.has(String(app.id)) && !serverIds.has(String(app.id)) &&
-          !localPendingApps.some(localApp => String(localApp.id) === String(app.id))) localPendingApps.push(app);
-    });
-
-    const mergedApps = [...localPendingApps, ...serverApps];
-    window.gApps = typeof window.sortApplicationsNewestFirst === 'function'
-      ? window.sortApplicationsNewestFirst(mergedApps)
-      : mergedApps;
-    window.gAssigns = snapshot.assignments.filter(item => item && !deletedAppIds.has(String(item.applyId || '')));
-    window.gClaims = snapshot.claims.filter(item => item && !deletedAppIds.has(String(item.applyId || '')));
-    window.gPayouts = snapshot.payouts.filter(item => item && !deletedAppIds.has(String(item.applyId || '')));
-    window.gConvexDataApplied = true;
-    window.gIsDataLoading = false;
+  function handleSharedConvexSnapshotApplied() {
     gHyundaiNewSnapshotLoaded = true;
-
-    try {
-      if (typeof window.safeSaveCachedApps === 'function') window.safeSaveCachedApps(window.gApps);
-      localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(window.gAssigns));
-      localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(window.gClaims));
-      localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(window.gPayouts));
-    } catch (e) {}
-
-    if (typeof window.updateConvexStatusBadge === 'function') window.updateConvexStatusBadge(true, window.gApps.length);
-    if (typeof window.updateSidebarCounts === 'function') window.updateSidebarCounts();
-    return true;
   }
 
-  function hasActiveHyundaiNewEditor() {
-    const container = document.getElementById('tab-hyundaiclaimhubnew');
-    const active = document.activeElement;
-    return gSaveInProgress.size > 0 || !!(container && active && container.contains(active) &&
-      /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName));
-  }
+  window.onAppConvexSnapshotApplied = handleSharedConvexSnapshotApplied;
+  window.isHyundaiNewSaving = () => gSaveInProgress.size > 0;
 
-  function flushHyundaiNewPendingSnapshot() {
-    if (!gHyundaiNewPendingSnapshot || hasActiveHyundaiNewEditor()) return;
-    const snapshot = gHyundaiNewPendingSnapshot;
-    gHyundaiNewPendingSnapshot = null;
-    if (applyHyundaiNewSnapshot(snapshot) && isHyundaiNewPageActive()) renderHyundaiClaimHubNew();
-  }
-
-  function refreshHyundaiNewSnapshotOnce() {
-    if (gHyundaiNewFallbackRefreshPromise) return gHyundaiNewFallbackRefreshPromise;
-    if (typeof window.queryConvex !== 'function') return Promise.resolve(false);
-    gHyundaiNewFallbackRefreshPromise = Promise.resolve()
-      .then(() => window.queryConvex('applications:careHubSnapshot', {}))
-      .then(response => {
-        const snapshot = response && response.value ? response.value : response;
-        if (!applyHyundaiNewSnapshot(snapshot)) return false;
-        if (isHyundaiNewPageActive()) renderHyundaiClaimHubNew();
-        return true;
-      })
-      .catch(err => {
-        console.warn('[Hyundai Claim Hub NEW Snapshot Refresh]', err);
-        return false;
-      })
-      .finally(() => { gHyundaiNewFallbackRefreshPromise = null; });
-    return gHyundaiNewFallbackRefreshPromise;
-  }
-
-  function startHyundaiNewSubscription() {
-    if (!isHyundaiNewPageActive()) return Promise.resolve(false);
-    const Client = window.CareHubConvexClient;
-    const convexUrl = window.CURRENT_CONVEX_URL;
-    if (typeof Client !== 'function' || !convexUrl) return refreshHyundaiNewSnapshotOnce();
-    if (gHyundaiNewSubscriptionReady && gHyundaiNewSnapshotUnsubscribe && gHyundaiNewSubscriptionUrl === convexUrl) {
-      return Promise.resolve(true);
-    }
-    if (gHyundaiNewSubscriptionPromise) return gHyundaiNewSubscriptionPromise;
-    if (gHyundaiNewSubscriptionUrl && gHyundaiNewSubscriptionUrl !== convexUrl) stopHyundaiNewSubscription();
-
-    const generation = ++gHyundaiNewSubscriptionGeneration;
-    gHyundaiNewSubscriptionUrl = convexUrl;
-    let settled = false;
-    let timeoutId = null;
-    gHyundaiNewSubscriptionPromise = new Promise(resolve => {
-      const settle = value => {
-        if (settled) return;
-        settled = true;
-        if (timeoutId) clearTimeout(timeoutId);
-        if (gHyundaiNewInitialSubscriptionResolve === settle) gHyundaiNewInitialSubscriptionResolve = null;
-        resolve(value);
-      };
-      gHyundaiNewInitialSubscriptionResolve = settle;
-
-      try {
-        gHyundaiNewConvexClient = new Client(convexUrl);
-        gHyundaiNewSnapshotUnsubscribe = gHyundaiNewConvexClient.onUpdate(
-          'applications:careHubSnapshot',
-          {},
-          snapshot => {
-            if (generation !== gHyundaiNewSubscriptionGeneration || !isHyundaiNewPageActive()) return;
-            if (!snapshot || snapshot.status !== 'success') return;
-            if (hasActiveHyundaiNewEditor()) {
-              gHyundaiNewPendingSnapshot = snapshot;
-            } else if (applyHyundaiNewSnapshot(snapshot)) {
-              renderHyundaiClaimHubNew();
-            }
-            gHyundaiNewSubscriptionReady = true;
-            settle(true);
-          },
-          err => {
-            if (generation !== gHyundaiNewSubscriptionGeneration) return;
-            console.warn('[Hyundai Claim Hub NEW Live Subscription]', err);
-            settle(false);
-            stopHyundaiNewSubscription();
-            refreshHyundaiNewSnapshotOnce();
-          }
-        );
-        timeoutId = setTimeout(() => {
-          settle(false);
-          if (!gHyundaiNewSubscriptionReady) {
-            stopHyundaiNewSubscription();
-            refreshHyundaiNewSnapshotOnce();
-          }
-        }, 15000);
-      } catch (err) {
-        console.warn('[Hyundai Claim Hub NEW Live Subscription Init]', err);
-        settle(false);
-        stopHyundaiNewSubscription();
-        refreshHyundaiNewSnapshotOnce();
-      }
-    }).finally(() => {
-      if (generation === gHyundaiNewSubscriptionGeneration) gHyundaiNewSubscriptionPromise = null;
-    });
-    return gHyundaiNewSubscriptionPromise;
-  }
-
-  function syncHyundaiNewSubscriptionLifecycle() {
-    if (isHyundaiNewPageActive()) startHyundaiNewSubscription();
-    else stopHyundaiNewSubscription();
-  }
-
-  function setupHyundaiNewSubscriptionLifecycle() {
-    if (gHyundaiNewVisibilityHandler) return;
-    gHyundaiNewVisibilityHandler = () => syncHyundaiNewSubscriptionLifecycle();
-    document.addEventListener('visibilitychange', gHyundaiNewVisibilityHandler);
-    document.addEventListener('focusout', () => setTimeout(flushHyundaiNewPendingSnapshot, 150));
-    const container = document.getElementById('tab-hyundaiclaimhubnew');
-    if (container && typeof MutationObserver === 'function') {
-      gHyundaiNewTabObserver = new MutationObserver(syncHyundaiNewSubscriptionLifecycle);
-      gHyundaiNewTabObserver.observe(container, { attributes: true, attributeFilter: ['class', 'style'] });
-    }
-    const customerModal = document.getElementById('hubCustomerDetailModal');
-    if (customerModal && !gHyundaiNewModalObserver && typeof MutationObserver === 'function') {
-      gHyundaiNewModalWasOpen = !customerModal.classList.contains('hidden') && customerModal.style.display !== 'none';
-      gHyundaiNewModalObserver = new MutationObserver(() => {
-        const isOpen = !customerModal.classList.contains('hidden') && customerModal.style.display !== 'none';
-        if (gHyundaiNewModalWasOpen && !isOpen && isHyundaiNewPageActive()) {
-          setTimeout(() => {
-            if (!hasActiveHyundaiNewEditor()) renderHyundaiClaimHubNew();
-          }, 0);
-        }
-        gHyundaiNewModalWasOpen = isOpen;
-      });
-      gHyundaiNewModalObserver.observe(customerModal, { attributes: true, attributeFilter: ['class', 'style'] });
-    }
-    syncHyundaiNewSubscriptionLifecycle();
-  }
-
-  // -----------------------------------------------------------------------
-  // 3. 메인 렌더링 함수 (엑셀형 시트뷰 인라인 에디팅)
-  // -----------------------------------------------------------------------
   function renderHyundaiClaimHubNew(filterParam) {
     const container = document.getElementById('tab-hyundaiclaimhubnew');
     if (!container) return;
-    setupHyundaiNewSubscriptionLifecycle();
-    syncHyundaiNewSubscriptionLifecycle();
 
     if (filterParam && typeof filterParam === 'object') {
       gHyundaiNewFilter = { ...gHyundaiNewFilter, ...filterParam };
@@ -2573,10 +2352,9 @@
     }
 
     try {
-      if (typeof window.queryConvex === 'function') {
-        const response = await window.queryConvex('applications:careHubSnapshot', {});
-        const snapshot = response && response.value ? response.value : response;
-        if (!applyHyundaiNewSnapshot(snapshot)) throw new Error('서버에서 유효한 스냅샷을 받지 못했습니다.');
+      if (typeof window.refreshAppConvexSnapshotOnce === 'function') {
+        const applied = await window.refreshAppConvexSnapshotOnce();
+        if (!applied) throw new Error('서버에서 유효한 스냅샷을 받지 못했습니다.');
       } else if (typeof window.runConvexLiveSync === 'function') {
         await window.runConvexLiveSync(true);
       } else {

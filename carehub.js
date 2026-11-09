@@ -7790,11 +7790,12 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                       <span class="font-medium text-slate-700 text-right break-keep leading-tight text-[10.5px] max-w-[220px]">${app.accidentDetail}</span>
                     </div>
                   ` : ''}
-                  ${(app.mobility || app.docAttached) ? `
+                  ${(app.mobility || app.surgeryStatus || app.docAttached) ? `
                     <div class="flex justify-between items-center text-[10.5px]">
-                      <span class="text-slate-400">거동 / 서류첨부:</span>
+                      <span class="text-slate-400">거동 / 수술 / 서류첨부:</span>
                       <span class="font-semibold text-slate-700">
                         거동: <b class="${app.mobility === '불가' ? 'text-rose-600' : 'text-emerald-700'}">${app.mobility || '가능'}</b> · 
+                        수술: <b class="${app.surgeryStatus === '예' || app.surgeryStatus === true ? 'text-rose-600' : 'text-slate-500'}">${app.surgeryStatus === '예' || app.surgeryStatus === true ? '예' : '아니오'}</b> · 
                         서류: <b class="${app.docAttached === '예' ? 'text-blue-600' : 'text-slate-500'}">${app.docAttached || '아니오'}</b>
                       </span>
                     </div>
@@ -12776,13 +12777,7 @@ var gHubAutoRefreshTimer = null;
 var gHubReturnRefreshPromise = null;
 var gHubTabVisibilityObserver = null;
 var gHubReturnProgressOwned = false;
-var gCareHubConvexClient = null;
-var gCareHubSnapshotUnsubscribe = null;
-var gCareHubSubscriptionPromise = null;
-var gCareHubSubscriptionUrl = '';
-var gCareHubSubscriptionGeneration = 0;
 var gCareHubSubscriptionReady = false;
-var gCareHubInitialSubscriptionResolve = null;
 var gCareHubSnapshotRenderTimer = null;
 var gCareHubSnapshotPendingRender = false;
 var gCareHubModalCloseObserver = null;
@@ -12885,7 +12880,6 @@ function applyCareHubSnapshot(snapshot) {
 }
 
 function stopCareHubCardSubscription() {
-  gCareHubSubscriptionGeneration++;
   gCareHubSnapshotPendingRender = false;
   if (gCareHubModalCloseObserver) {
     gCareHubModalCloseObserver.disconnect();
@@ -12895,93 +12889,20 @@ function stopCareHubCardSubscription() {
     clearTimeout(gCareHubSnapshotRenderTimer);
     gCareHubSnapshotRenderTimer = null;
   }
-  if (gCareHubSnapshotUnsubscribe) {
-    try { gCareHubSnapshotUnsubscribe(); } catch (e) {}
-    gCareHubSnapshotUnsubscribe = null;
-  }
-  if (gCareHubConvexClient) {
-    try { gCareHubConvexClient.close(); } catch (e) {}
-    gCareHubConvexClient = null;
-  }
-  gCareHubSubscriptionUrl = '';
-  gCareHubSubscriptionReady = false;
-  gCareHubSubscriptionPromise = null;
-  if (gCareHubInitialSubscriptionResolve) {
-    gCareHubInitialSubscriptionResolve(false);
-    gCareHubInitialSubscriptionResolve = null;
-  }
+  if (typeof window.syncAppConvexSnapshotSubscription === 'function') return window.syncAppConvexSnapshotSubscription();
+  return Promise.resolve(false);
 }
 
 function refreshCareHubSnapshotOnce() {
-  if (typeof queryConvex !== 'function') return Promise.resolve(false);
-  return queryConvex('applications:careHubSnapshot', {}).then(response => {
-    const snapshot = response && response.value ? response.value : response;
-    return applyCareHubSnapshot(snapshot);
-  }).catch(err => {
-    console.warn('[CareHub Snapshot Refresh]', err);
-    return false;
-  });
+  if (typeof window.refreshAppConvexSnapshotOnce === 'function') return window.refreshAppConvexSnapshotOnce();
+  return Promise.resolve(false);
 }
 
 function startCareHubCardSubscription() {
-  if (!isCareHubSnapshotConsumerVisible()) return Promise.resolve(false);
   if (gActiveTab === HUB_AUTO_REFRESH_PAGE_ID && gIsDataLoading && !gConvexDataApplied) return Promise.resolve(false);
-  if (gCareHubSubscriptionReady && gCareHubSnapshotUnsubscribe) return Promise.resolve(true);
-  if (gCareHubSubscriptionPromise) return gCareHubSubscriptionPromise;
-
-  const Client = window.CareHubConvexClient;
-  const convexUrl = window.CURRENT_CONVEX_URL;
-  if (typeof Client !== 'function' || !convexUrl) {
-    return refreshCareHubSnapshotOnce();
-  }
-
-  const generation = ++gCareHubSubscriptionGeneration;
-  gCareHubSubscriptionUrl = convexUrl;
-  let settled = false;
-  let timeoutId = null;
-  gCareHubSubscriptionPromise = new Promise(resolve => {
-    const settle = value => {
-      if (settled) return;
-      settled = true;
-      if (timeoutId) clearTimeout(timeoutId);
-      if (gCareHubInitialSubscriptionResolve === settle) gCareHubInitialSubscriptionResolve = null;
-      resolve(value);
-    };
-    gCareHubInitialSubscriptionResolve = settle;
-
-    try {
-      gCareHubConvexClient = new Client(convexUrl);
-      gCareHubSnapshotUnsubscribe = gCareHubConvexClient.onUpdate(
-        'applications:careHubSnapshot',
-        {},
-        snapshot => {
-          if (generation !== gCareHubSubscriptionGeneration || !isCareHubSnapshotConsumerVisible()) return;
-          if (!applyCareHubSnapshot(snapshot)) return;
-          gCareHubSubscriptionReady = true;
-          settle(true);
-        },
-        err => {
-          if (generation !== gCareHubSubscriptionGeneration) return;
-          console.warn('[CareHub Live Subscription]', err);
-          settle(false);
-          stopCareHubCardSubscription();
-        }
-      );
-      timeoutId = setTimeout(() => {
-        settle(false);
-        if (!gCareHubSubscriptionReady) stopCareHubCardSubscription();
-      }, 15000);
-    } catch (err) {
-      console.warn('[CareHub Live Subscription Init]', err);
-      settle(false);
-    }
-  }).finally(() => {
-    gCareHubSubscriptionPromise = null;
-  });
-
-  return gCareHubSubscriptionPromise;
+  if (typeof window.startAppConvexSnapshotSubscription === 'function') return window.startAppConvexSnapshotSubscription();
+  return Promise.resolve(false);
 }
-
 function showHubReturnBlockingProgress() {
   const progressModal = document.getElementById('globalProgressModal') || document.getElementById('globalCareLogProgressModal');
   if (progressModal && !progressModal.classList.contains('hidden')) return;
@@ -13266,7 +13187,7 @@ function ensureHubAutoRefreshControl() {
   installCareHubTabVisibilityObserver();
   syncHubAutoRefreshTimer();
   if (typeof window.CareHubConvexClient === 'function' && isCareHubTabVisible() &&
-      (!gIsDataLoading || gConvexDataApplied) && !gCareHubSubscriptionReady && !gCareHubSubscriptionPromise) {
+      (!gIsDataLoading || gConvexDataApplied) && !gCareHubSubscriptionReady && !gAppSnapshotSubscriptionPromise) {
     startCareHubCardSubscription();
   }
 }
@@ -15170,6 +15091,7 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
     console.error('hubCustomerDetailModal element not found!');
     return;
   }
+ // observeCareHubModalScrollRestore(modalEl);
 
   // Fallback if applyId is missing
   if (!applyId && typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {

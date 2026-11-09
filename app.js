@@ -2333,6 +2333,7 @@ async function loadConvexData(showSpinner = true) {
     else if (gActiveTab === 'samsungclaimhub' && typeof renderSamsungClaimHub === 'function') renderSamsungClaimHub();
     if ((gActiveTab === 'surveymgmt' || gActiveTab === 'surveymgmt_new' || gActiveTab === 'survey') && typeof loadSurveyMgmtData === 'function') loadSurveyMgmtData(false);
 
+    if (typeof syncAppConvexSnapshotSubscription === 'function') syncAppConvexSnapshotSubscription();
     if (!gConvexLiveSyncTimer) {
       startConvexLiveSync();
     }
@@ -2425,7 +2426,221 @@ function updateConvexStatusBadge(connected, count) {
   }
 }
 
+
 // =========================================================================
+var gAppSnapshotConvexClient = null;
+var gAppSnapshotUnsubscribe = null;
+var gAppSnapshotSubscriptionPromise = null;
+var gAppSnapshotSubscriptionUrl = '';
+var gAppSnapshotSubscriptionGeneration = 0;
+var gAppSnapshotSubscriptionReady = false;
+var gAppSnapshotPending = null;
+var gAppSnapshotTabObservers = [];
+var gAppSnapshotLifecycleReady = false;
+
+function isAppSnapshotConsumerActive() {
+  if (document.hidden) return false;
+  const tabByName = {
+    carehub: 'tab-carehub',
+    hyundaiclaimhub: 'tab-hyundaiclaimhub',
+    hyundaiclaimhubnew: 'tab-hyundaiclaimhubnew',
+    samsungclaimhub: 'tab-samsungclaimhub'
+  };
+  const tabId = tabByName[gActiveTab];
+  const tab = tabId && document.getElementById(tabId);
+  return !!tab && !tab.classList.contains('hidden') && tab.style.display !== 'none';
+}
+
+function hasAppSnapshotEditInProgress() {
+  const active = document.activeElement;
+  const activeTab = active && active.closest && active.closest(
+    '#tab-carehub, #tab-hyundaiclaimhub, #tab-hyundaiclaimhubnew, #tab-samsungclaimhub'
+  );
+  if (activeTab && (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable)) return true;
+  if (typeof gSamsungPendingChanges !== 'undefined' && gSamsungPendingChanges?.size > 0) return true;
+  if (typeof window.isHyundaiNewSaving === 'function' && window.isHyundaiNewSaving()) return true;
+  return false;
+}
+
+function applyAppConvexSnapshot(snapshot) {
+  if (!snapshot || snapshot.status !== 'success' || typeof window.applyCareHubSnapshot !== 'function') return false;
+  if (!window.applyCareHubSnapshot(snapshot)) return false;
+
+  if (Array.isArray(snapshot.samsungSheets)) {
+    if (!window.gSamsungSheets || typeof window.gSamsungSheets !== 'object') {
+      window.gSamsungSheets = { target: [], completed: [], eligible: [], contacts: [] };
+    }
+    const sheets = window.gSamsungSheets;
+    ['target', 'completed', 'contacts'].forEach(sheetKey => {
+      const rows = snapshot.samsungSheets.filter(row => row && row.sheetKey === sheetKey);
+      sheets[sheetKey] = typeof window.healSamsungSheetData === 'function'
+        ? window.healSamsungSheetData(sheetKey, rows)
+        : rows;
+    });
+    try {
+      localStorage.setItem('LIVON_SAMSUNG_SHEET_TARGET', JSON.stringify(sheets.target));
+      localStorage.setItem('LIVON_SAMSUNG_SHEET_COMPLETED', JSON.stringify(sheets.completed));
+      localStorage.setItem('LIVON_SAMSUNG_SHEET_CONTACTS', JSON.stringify(sheets.contacts));
+      localStorage.setItem('LIVON_SAMSUNG_EXCEL_LEDGER', JSON.stringify({
+        target: sheets.target,
+        completed: sheets.completed,
+        contacts: sheets.contacts,
+        eligible: Array.isArray(sheets.eligible) && sheets.eligible.length <= 100 ? sheets.eligible : []
+      }));
+    } catch (e) {}
+  }
+
+  gAppSnapshotSubscriptionReady = true;
+  window.gCareHubSubscriptionReady = true;
+  if (typeof window.onAppConvexSnapshotApplied === 'function') window.onAppConvexSnapshotApplied(snapshot);
+  if (gActiveTab === 'samsungclaimhub') {
+    if (typeof window.renderCurrentSamsungSheet === 'function') window.renderCurrentSamsungSheet();
+    if (typeof window.renderSamsungClaimHub === 'function') window.renderSamsungClaimHub();
+  } else if (gActiveTab === 'hyundaiclaimhubnew' && typeof window.renderHyundaiClaimHubNew === 'function') {
+    window.renderHyundaiClaimHubNew();
+  }
+  return true;
+}
+
+function flushAppConvexSnapshot() {
+  if (!gAppSnapshotPending || hasAppSnapshotEditInProgress()) return false;
+  const snapshot = gAppSnapshotPending;
+  gAppSnapshotPending = null;
+  return applyAppConvexSnapshot(snapshot);
+}
+
+function stopAppConvexSnapshotSubscription() {
+  gAppSnapshotSubscriptionGeneration++;
+  gAppSnapshotPending = null;
+  if (gAppSnapshotUnsubscribe) {
+    try { gAppSnapshotUnsubscribe(); } catch (e) {}
+    gAppSnapshotUnsubscribe = null;
+  }
+  if (gAppSnapshotConvexClient) {
+    try { gAppSnapshotConvexClient.close(); } catch (e) {}
+    gAppSnapshotConvexClient = null;
+  }
+  gAppSnapshotSubscriptionUrl = '';
+  gAppSnapshotSubscriptionReady = false;
+  gAppSnapshotSubscriptionPromise = null;
+  window.gCareHubSubscriptionReady = false;
+}
+
+function startAppConvexSnapshotSubscription() {
+  if (!isAppSnapshotConsumerActive()) return Promise.resolve(false);
+  if (gIsDataLoading && !gConvexDataApplied) return Promise.resolve(false);
+  const Client = window.CareHubConvexClient;
+  const convexUrl = window.CURRENT_CONVEX_URL;
+  if (gAppSnapshotSubscriptionReady && gAppSnapshotUnsubscribe && gAppSnapshotSubscriptionUrl === convexUrl) {
+    return Promise.resolve(true);
+  }
+  if (gAppSnapshotSubscriptionPromise) return gAppSnapshotSubscriptionPromise;
+  if (gAppSnapshotSubscriptionUrl && gAppSnapshotSubscriptionUrl !== convexUrl) stopAppConvexSnapshotSubscription();
+  if (typeof Client !== 'function' || !convexUrl) return refreshAppConvexSnapshotOnce();
+
+  const generation = ++gAppSnapshotSubscriptionGeneration;
+  gAppSnapshotSubscriptionUrl = convexUrl;
+  let settled = false;
+  let timeoutId = null;
+  gAppSnapshotSubscriptionPromise = new Promise(resolve => {
+    const settle = value => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      resolve(value);
+    };
+    try {
+      gAppSnapshotConvexClient = new Client(convexUrl);
+      gAppSnapshotUnsubscribe = gAppSnapshotConvexClient.onUpdate(
+        'applications:careHubSnapshot',
+        {},
+        snapshot => {
+          if (generation !== gAppSnapshotSubscriptionGeneration || !isAppSnapshotConsumerActive()) return;
+          if (!snapshot || snapshot.status !== 'success') return;
+          gAppSnapshotSubscriptionReady = true;
+          window.gCareHubSubscriptionReady = true;
+          settle(true);
+          if (hasAppSnapshotEditInProgress()) {
+            gAppSnapshotPending = snapshot;
+            return;
+          }
+          if (applyAppConvexSnapshot(snapshot)) {
+            return;
+          }
+        },
+        error => {
+          if (generation !== gAppSnapshotSubscriptionGeneration) return;
+          console.warn('[Convex Shared Snapshot Subscription]', error);
+          settle(false);
+          stopAppConvexSnapshotSubscription();
+          refreshAppConvexSnapshotOnce();
+        }
+      );
+      timeoutId = setTimeout(() => {
+        settle(false);
+        if (!gAppSnapshotSubscriptionReady) {
+          stopAppConvexSnapshotSubscription();
+          refreshAppConvexSnapshotOnce();
+        }
+      }, 15000);
+    } catch (error) {
+      console.warn('[Convex Shared Snapshot Subscription Init]', error);
+      settle(false);
+      stopAppConvexSnapshotSubscription();
+      refreshAppConvexSnapshotOnce();
+    }
+  }).finally(() => {
+    if (generation === gAppSnapshotSubscriptionGeneration) gAppSnapshotSubscriptionPromise = null;
+  });
+  return gAppSnapshotSubscriptionPromise;
+}
+
+function refreshAppConvexSnapshotOnce() {
+  if (typeof queryConvex !== 'function') return Promise.resolve(false);
+  return queryConvex('applications:careHubSnapshot', {}).then(response => {
+    const snapshot = response && response.value ? response.value : response;
+    if (hasAppSnapshotEditInProgress()) {
+      gAppSnapshotPending = snapshot;
+      return true;
+    }
+    return applyAppConvexSnapshot(snapshot);
+  }).catch(error => {
+    console.warn('[Convex Shared Snapshot Refresh]', error);
+    return false;
+  });
+}
+
+function syncAppConvexSnapshotSubscription() {
+  if (isAppSnapshotConsumerActive()) return startAppConvexSnapshotSubscription();
+  stopAppConvexSnapshotSubscription();
+  return Promise.resolve(false);
+}
+
+function setupAppConvexSnapshotSubscription() {
+  if (gAppSnapshotLifecycleReady) return syncAppConvexSnapshotSubscription();
+  gAppSnapshotLifecycleReady = true;
+  const tabIds = ['tab-carehub', 'tab-hyundaiclaimhub', 'tab-hyundaiclaimhubnew', 'tab-samsungclaimhub'];
+  if (typeof MutationObserver === 'function') {
+    tabIds.forEach(id => {
+      const tab = document.getElementById(id);
+      if (!tab) return;
+      const observer = new MutationObserver(syncAppConvexSnapshotSubscription);
+      observer.observe(tab, { attributes: true, attributeFilter: ['class', 'style'] });
+      gAppSnapshotTabObservers.push(observer);
+    });
+  }
+  document.addEventListener('visibilitychange', syncAppConvexSnapshotSubscription);
+  document.addEventListener('focusout', () => setTimeout(flushAppConvexSnapshot, 150));
+  return syncAppConvexSnapshotSubscription();
+}
+
+window.startAppConvexSnapshotSubscription = startAppConvexSnapshotSubscription;
+window.stopAppConvexSnapshotSubscription = stopAppConvexSnapshotSubscription;
+window.syncAppConvexSnapshotSubscription = syncAppConvexSnapshotSubscription;
+window.setupAppConvexSnapshotSubscription = setupAppConvexSnapshotSubscription;
+window.refreshAppConvexSnapshotOnce = refreshAppConvexSnapshotOnce;
+window.addEventListener('load', setupAppConvexSnapshotSubscription, { once: true });
+
 // [실시간 동기화 엔진] Convex Cloud DB 백그라운드 주기적 폴링 및 화면 실시간 갱신
 // =========================================================================
 var gConvexLiveSyncTimer = null;
@@ -6312,7 +6527,7 @@ var gActiveExcelPreviewSheet = 'target';
 
 // 4 Sheets Column Schemas (Exact columns specified by user & images)
 const SAMSUNG_SHEET_SCHEMAS = {
-  // [시트 1] 대상자: 20개 컬럼 (첨부 이미지 2 A~T열 완벽 일치)
+  // [시트 1] 대상자: 22개 컬럼 (첨부 이미지 2 A~T열 완벽 일치)
   target: [
     { key: 'patientId', label: '피보험자ID', width: '110px' },
     { key: 'patientName', label: '피보험자명', width: '100px' },
@@ -6328,6 +6543,8 @@ const SAMSUNG_SHEET_SCHEMAS = {
     { key: 'hasDiseaseCare', label: '질병입원간병인', width: '110px' },
     { key: 'applyDateTime', label: '간병신청 접수일시', width: '140px' },
     { key: 'accidentType', label: '상해/질병 여부', width: '110px' },
+    { key: 'surgeryStatus', label: '수술여부(Y/N)', width: '100px' },
+    { key: 'readmissionStatus', label: '재입원여부(Y/N)', width: '110px' },
     { key: 'accidentDate', label: '사고일자', width: '100px' },
     { key: 'diagnosis', label: '진단명/증상', width: '160px' },
     { key: 'hospitalName', label: '병원명', width: '140px' },
@@ -7133,7 +7350,13 @@ function healSamsungSheetData(sheetKey, rows) {
       if (!r) return r;
       const pid = String(r.patientId || r.id || '').trim();
       const def = defaultList.find(d => d && (String(d.patientId || d.id) === pid || (r.patientName && d.patientName === r.patientName)));
-      if (!def) return r;
+      if (!def) {
+        return {
+          ...r,
+          surgeryStatus: normalizeSamsungSurgeryStatus(r.surgeryStatus) || 'N',
+          readmissionStatus: normalizeSamsungReadmissionStatus(r.readmissionStatus) || 'N'
+        };
+      }
       return {
         ...def,
         ...r,
@@ -7148,6 +7371,8 @@ function healSamsungSheetData(sheetKey, rows) {
         careEndDate: r.careEndDate || def.careEndDate || r.expectedEndDate || '',
         hasInjuryCare: (r.hasInjuryCare === 'Y' || r.hasInjuryCare === true || r.hasInjuryCare === '가입') ? 'Y' : (def.hasInjuryCare || 'Y'),
         hasDiseaseCare: (r.hasDiseaseCare === 'Y' || r.hasDiseaseCare === true || r.hasDiseaseCare === '가입') ? 'Y' : (def.hasDiseaseCare || 'Y'),
+        surgeryStatus: normalizeSamsungSurgeryStatus(r.surgeryStatus ?? def.surgeryStatus) || 'N',
+        readmissionStatus: normalizeSamsungReadmissionStatus(r.readmissionStatus ?? def.readmissionStatus) || 'N',
         applicantContact: r.applicantContact || def.applicantContact || r.phone || ''
       };
     }).filter(Boolean);
@@ -7663,6 +7888,24 @@ window.refreshSamsungSheetPatientIdsFromEligible = refreshSamsungSheetPatientIds
  * 통합허브 고객(app) 객체를 삼성화재 대상자(target) 시트 행 객체로 변환
  * 피보험자 아이디(patientId)는 사전명단(누적 가입자DB)의 피보험자 ID값을 우선 적용
  */
+function normalizeSamsungSurgeryStatus(value) {
+  if (value === true) return 'Y';
+  if (value === false) return 'N';
+  const normalized = String(value || '').trim().toUpperCase();
+  if (['예', 'Y', 'YES', 'TRUE'].includes(normalized)) return 'Y';
+  if (['아니오', 'N', 'NO', 'FALSE'].includes(normalized)) return 'N';
+  return '';
+}
+
+function normalizeSamsungReadmissionStatus(value) {
+  if (value === true) return 'Y';
+  if (value === false) return 'N';
+  const normalized = String(value || '').trim().toUpperCase();
+  if (['예', 'Y', 'YES', 'TRUE'].includes(normalized)) return 'Y';
+  if (['아니오', 'N', 'NO', 'FALSE'].includes(normalized)) return 'N';
+  return '';
+}
+
 function convertHubAppToSamsungTargetRow(app) {
   if (!app) return null;
   const appId = String(app.id || '').trim();
@@ -7692,6 +7935,8 @@ function convertHubAppToSamsungTargetRow(app) {
     applyDateTime: app.applyDateTime || app.applyDate || '',
     applyDate: app.applyDate || app.applyDateTime || '',
     accidentType: app.accidentType || '질병',
+    surgeryStatus: normalizeSamsungSurgeryStatus(app.surgeryStatus) || 'N',
+    readmissionStatus: normalizeSamsungReadmissionStatus(app.readmissionStatus) || 'N',
     accidentDate: app.accidentDate || '',
     accidentNumber: app.accidentNumber || '',
     diagnosis: app.diagnosis || app.diseaseName || (app.memo && String(app.memo).match(/\[진단명:\s*([^\]]+)\]/)?.[1]?.trim()) || '',
@@ -7810,6 +8055,22 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
       }
       if (app.gender && existing.gender !== app.gender && !edited.gender) {
         existing.gender = app.gender;
+        changed = true;
+      }
+      const surgeryStatus = normalizeSamsungSurgeryStatus(app.surgeryStatus);
+      if (surgeryStatus && existing.surgeryStatus !== surgeryStatus && !edited.surgeryStatus) {
+        existing.surgeryStatus = surgeryStatus;
+        changed = true;
+      } else if (!surgeryStatus && !existing.surgeryStatus && !edited.surgeryStatus) {
+        existing.surgeryStatus = 'N';
+        changed = true;
+      }
+      const readmissionStatus = normalizeSamsungReadmissionStatus(app.readmissionStatus);
+      if (readmissionStatus && existing.readmissionStatus !== readmissionStatus && !edited.readmissionStatus) {
+        existing.readmissionStatus = readmissionStatus;
+        changed = true;
+      } else if (!readmissionStatus && !existing.readmissionStatus && !edited.readmissionStatus) {
+        existing.readmissionStatus = 'N';
         changed = true;
       }
       if (app.phone && (!existing.phone || existing.phone !== app.phone) && !edited.phone) {
@@ -8709,6 +8970,12 @@ function renderCurrentSamsungSheet() {
             const extraStyle = st.isSticky ? st.style : `min-width: ${col.width}; width: ${col.width};`;
             const cellBg = hasPending ? 'bg-amber-100/90 font-semibold text-amber-950 ring-1 ring-amber-400' : (st.isSticky ? st.bg : (isSelected ? 'bg-sky-50/70' : ''));
             const cellText = (col.key === 'patientName') ? 'font-bold text-slate-900' : 'text-slate-800';
+            const isYesNoStatus = col.key === 'surgeryStatus' || col.key === 'readmissionStatus';
+            const pendingStatus = gSamsungPendingChanges.get(`${gActiveSamsungSheet}_${realIdx}_${col.key}`)?.newVal;
+            const statusValue = pendingStatus || normalizeSamsungSheetYesNoStatus(col.key, rawVal) || 'N';
+            const cellContent = isYesNoStatus
+              ? `<select aria-label="${col.label}" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="onSamsungYesNoStatusChange(this, '${gActiveSamsungSheet}', ${realIdx}, '${col.key}')" class="rounded-md border border-slate-300 bg-white px-1.5 py-1 text-xs font-bold text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"><option value="N" ${statusValue === 'N' ? 'selected' : ''}>N</option><option value="Y" ${statusValue === 'Y' ? 'selected' : ''}>Y</option></select>`
+              : displayVal;
 
             return `
               <td contenteditable="false" 
@@ -8723,7 +8990,7 @@ function renderCurrentSamsungSheet() {
                 class="p-2 border-r border-b border-slate-200 whitespace-nowrap overflow-hidden text-ellipsis transition-all cursor-cell select-none ${cellBg} ${cellText} hover:bg-sky-50/70" 
                 style="${extraStyle}" 
                 title="${cellTitle}">
-                ${displayVal}
+                ${cellContent}
               </td>
             `;
           }).join('')}
@@ -8879,6 +9146,7 @@ function onSamsungCellClick(e, el, sheetKey, rowIdx, colKey) {
 }
 
 function onSamsungCellDblClick(e, el, sheetKey, rowIdx, colKey) {
+  if (colKey === 'surgeryStatus' || colKey === 'readmissionStatus') return;
   el.contentEditable = "true";
   el.classList.remove('select-none', 'ring-sky-600', 'bg-sky-100/60');
   el.classList.add('ring-2', 'ring-blue-600', 'ring-inset', 'bg-white', 'samsung-cell-editing', 'text-slate-900');
@@ -8900,6 +9168,32 @@ function onSamsungCellDblClick(e, el, sheetKey, rowIdx, colKey) {
     sel.removeAllRanges();
     sel.addRange(range);
   } catch (err) {}
+}
+
+function normalizeSamsungSheetYesNoStatus(colKey, value) {
+  return colKey === 'readmissionStatus'
+    ? normalizeSamsungReadmissionStatus(value)
+    : normalizeSamsungSurgeryStatus(value);
+}
+
+function onSamsungYesNoStatusChange(select, sheetKey, rowIdx, colKey) {
+  const row = gSamsungSheets?.[sheetKey]?.[rowIdx];
+  if (!row) return;
+  const newVal = normalizeSamsungSheetYesNoStatus(colKey, select.value) || 'N';
+  const changeKey = `${sheetKey}_${rowIdx}_${colKey}`;
+  const origVal = normalizeSamsungSheetYesNoStatus(colKey, row[colKey]) || 'N';
+  const cell = select.closest('td');
+
+  if (newVal !== origVal) {
+    gSamsungPendingChanges.set(changeKey, { sheetKey, rowIdx, colKey, newVal, origVal });
+    cell?.classList.add('bg-amber-100/90', 'font-semibold', 'text-amber-950', 'ring-1', 'ring-amber-400');
+    if (cell) cell.title = `수정됨 (기존: ${origVal}) - [수정사항 저장] 클릭 시 최종 반영`;
+  } else {
+    gSamsungPendingChanges.delete(changeKey);
+    cell?.classList.remove('bg-amber-100/90', 'font-semibold', 'text-amber-950', 'ring-1', 'ring-amber-400');
+    if (cell) cell.title = newVal;
+  }
+  updateSamsungPendingChangesUI();
 }
 
 function onSamsungCellKeyDown(e, el, sheetKey, rowIdx, colKey) {
@@ -8924,7 +9218,9 @@ function onSamsungCellBlur(el, sheetKey, rowIdx, colKey) {
   if (!gSamsungSheets[sheetKey] || !gSamsungSheets[sheetKey][rowIdx]) return;
 
   let newVal = el.innerText.trim();
-  if (colKey === 'birthDate') {
+  if (colKey === 'surgeryStatus' || colKey === 'readmissionStatus') {
+    newVal = normalizeSamsungSheetYesNoStatus(colKey, newVal) || 'N';
+  } else if (colKey === 'birthDate') {
     newVal = formatSamsungBirthDate(newVal);
   } else if (isSamsungDateColumn(colKey)) {
     newVal = formatSamsungDate(newVal);
@@ -9019,6 +9315,7 @@ function saveSamsungSheetPendingChanges() {
 
   const affectedSheets = new Set();
   const modifiedEligibleIndices = new Set();
+  const updatedStatusApps = new Set();
 
   for (const [key, item] of gSamsungPendingChanges.entries()) {
     const { sheetKey, rowIdx, colKey, newVal } = item;
@@ -9030,6 +9327,19 @@ function saveSamsungSheetPendingChanges() {
       row._editedCols[colKey] = true;
       affectedSheets.add(sheetKey);
 
+      if (sheetKey === 'target' && (colKey === 'surgeryStatus' || colKey === 'readmissionStatus')) {
+        const appId = String(row.appId || row.id || '').trim();
+        const status = normalizeSamsungSheetYesNoStatus(colKey, newVal);
+        if (appId && status && Array.isArray(gApps)) {
+          const app = gApps.find(candidate => String(candidate?.id || '').trim() === appId);
+          if (app) {
+            app[colKey] = status === 'Y' ? '예' : '아니오';
+            app.updatedAt = new Date().toISOString();
+            updatedStatusApps.add(app);
+          }
+        }
+      }
+
       if (sheetKey === 'eligible') {
         if (gSamsungList && gSamsungList[rowIdx]) {
           gSamsungList[rowIdx][colKey] = newVal;
@@ -9039,6 +9349,15 @@ function saveSamsungSheetPendingChanges() {
         }
         modifiedEligibleIndices.add(rowIdx);
       }
+    }
+  }
+
+  if (updatedStatusApps.size > 0) {
+    if (typeof saveApplications === 'function') saveApplications();
+    if (typeof syncToConvex === 'function') {
+      updatedStatusApps.forEach(app => {
+        syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+      });
     }
   }
 
@@ -32250,6 +32569,7 @@ function handleNewAppSubmit(e) {
       expectedDays: expectedDays,
       careEndDate: careEndDate,
       surgeryStatus: document.querySelector('input[name="newAppSurgeryStatus"]:checked')?.value || '아니오',
+      readmissionStatus: '아니오',
       status: '접수',
       applicantName: applicantName,
       applicantBirth: applicantBirth,
