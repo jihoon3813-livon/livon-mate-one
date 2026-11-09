@@ -507,6 +507,7 @@
           payoutAmount,
           payoutStatus,
           caregiverName,
+          invoiceStatus: String(payout && payout.invoiceStatus || claimSet && claimSet.invoiceStatus || '미발급'),
           memo: claim.memo || (payout && payout.memo) || ''
         };
         gHyundaiNewClaimOnlySets.set(`${appId}_${setIndex}`, cSet);
@@ -517,7 +518,7 @@
           claimDate: cSet.claimDate, claimDays, dailyClaimPrice, claimAmount, claimStatus,
           depositAmount, depositDate: cSet.depositDate, depositStatus,
           payoutRound, payoutStandardDate: cSet.payoutStandardDate, payoutDate: cSet.payoutDate,
-          payoutDays, cgDailyWage, payoutAmount, payoutStatus, memo: cSet.memo
+          payoutDays, cgDailyWage, payoutAmount, payoutStatus, invoiceStatus: cSet.invoiceStatus, memo: cSet.memo
         });
       });
     });
@@ -592,6 +593,7 @@
           cgDailyWage,
           payoutAmount,
           payoutStatus,
+          invoiceStatus: String(payout && payout.invoiceStatus || customSet.invoiceStatus || '미발급'),
           caregiverName: round.caregiverName || (payout && payout.caregiverName) || as && as.caregiverName || app.caregiverName || app.assignedCaregiverName || '-',
           memo: round.memo || customSet.memo || claim && claim.memo || payout && payout.memo || ''
         };
@@ -605,7 +607,7 @@
           claimStatus: cSet.claimStatus, depositAmount, depositDate: cSet.depositDate,
           depositStatus, payoutRound, payoutStandardDate: cSet.payoutStandardDate,
           payoutDate: cSet.payoutDate, payoutDays, cgDailyWage, payoutAmount,
-          payoutStatus, memo: cSet.memo
+          payoutStatus, invoiceStatus: cSet.invoiceStatus, memo: cSet.memo
         });
       });
     });
@@ -1017,7 +1019,7 @@
       const hasExistingFaxClaimTarget = group.allRows.some(row => isFaxClaimNeeded(row));
       return `
         <tr class="bg-white border-t-2 border-slate-300">
-          <td colspan="22" class="p-0">
+          <td colspan="23" class="p-0">
             <div class="w-full px-4 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-2 ${expanded ? 'bg-amber-50/40' : 'bg-white'}">
               <div class="min-w-0 flex-1 flex flex-col lg:flex-row lg:items-center justify-between gap-2">
                 <div class="flex flex-wrap items-center gap-2 lg:gap-3 min-w-0">
@@ -1283,7 +1285,7 @@
                     STEP 2. 보험금 입금 확인
                   </span>
                 </th>
-                <th colspan="5" class="py-2.5 px-3 bg-purple-950 border-b border-purple-900">
+                <th colspan="6" class="py-2.5 px-3 bg-purple-950 border-b border-purple-900">
                   <span class="flex items-center justify-center gap-1.5 text-purple-200">
                     <i data-lucide="banknote" class="w-3.5 h-3.5 text-purple-400"></i>
                     STEP 3. 간병비 지급 (간병비지급 시트)
@@ -1328,6 +1330,7 @@
                 <th class="py-2 px-3 bg-purple-50/60 text-purple-950 text-right">간병인 일당 ✎</th>
                 <th class="py-2 px-3 bg-purple-50/60 text-purple-950 text-right" title="일수*일당 (직접 수정 시 수동조정 가능)">지급 대상액 ✎</th>
                 <th class="py-2 px-3 bg-purple-100 text-purple-950 font-black">지급 상태 ▼</th>
+                <th class="py-2 px-3 bg-purple-100 text-purple-950 font-black">계산서발행여부 ▼</th>
 
                 <!-- 기타 -->
                 <th class="py-2 px-3 text-left">특이사항 / 메모 ✎</th>
@@ -1341,7 +1344,7 @@
     if (customerGroups.length === 0) {
       html += `
               <tr>
-                <td colspan="22" class="py-16 text-center text-slate-400 bg-slate-50/50">
+                <td colspan="23" class="py-16 text-center text-slate-400 bg-slate-50/50">
                   <div class="flex flex-col items-center justify-center gap-2">
                     <i data-lucide="inbox" class="w-8 h-8 text-slate-300"></i>
                     <p class="font-bold text-sm text-slate-600">조회된 현대해상 청구세트가 없습니다.</p>
@@ -1356,7 +1359,7 @@
         if (!group.isExpanded) return;
 
         if (group.rows.length === 0) {
-          html += `<tr class="bg-rose-50/30"><td colspan="22" class="px-5 py-4 text-sm text-slate-700">
+          html += `<tr class="bg-rose-50/30"><td colspan="23" class="px-5 py-4 text-sm text-slate-700">
             <span class="font-bold">${escapeHtml(group.claimNeededThrough)}까지 청구요청이 확인되지 않은 간병 기간이 있습니다.</span>
             <span class="ml-2 text-slate-500">현재 목록에 표시할 청구서가 없습니다. 상세에서 기간을 선택해 생성할 수 있습니다.</span>
             <button type="button" onclick="window.openHubCustomerDetailModal && window.openHubCustomerDetailModal('${escapeHtml(group.appId)}')"
@@ -1382,6 +1385,8 @@
 
         const payoutStatusColor = (row.payoutStatus === '지급완료' || row.payoutStatus === '지급') ?
           'text-purple-700 bg-purple-50 border-purple-300' : 'text-slate-700 bg-slate-50 border-slate-300';
+        const invoiceStatusColor = row.invoiceStatus === '발급' ?
+          'text-emerald-700 bg-emerald-50 border-emerald-300' : 'text-slate-700 bg-slate-50 border-slate-300';
 
         html += `
               <tr id="row-${rowKey}" class="${zebraClass} hover:bg-amber-50/30 transition-colors divide-x divide-slate-100 group">
@@ -1558,6 +1563,16 @@
                     <option value="지급전" ${row.payoutStatus === '지급전' ? 'selected' : ''}>지급전</option>
                     <option value="지급완료" ${row.payoutStatus === '지급완료' ? 'selected' : ''}>지급완료</option>
                     ${(row.payoutStatus && row.payoutStatus !== '지급전' && row.payoutStatus !== '지급완료') ? `<option value="${escapeHtml(row.payoutStatus)}" selected>${escapeHtml(row.payoutStatus)}</option>` : ''}
+                  </select>
+                </td>
+
+                <!-- 계산서 발행 여부 드롭다운 (선택 즉시 저장) -->
+                <td class="py-1 px-2 text-center bg-purple-50/20" id="cell-invoiceStatus-${rowKey}">
+                  <select onchange="window.handleHyundaiNewStatusChange('${row.appId}', ${row.setIndex}, 'invoiceStatus', this)"
+                    class="px-2 py-1 text-[10px] font-bold rounded-md border shadow-2xs focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer ${invoiceStatusColor}"
+                    title="계산서 발행 여부">
+                    <option value="미발급" ${row.invoiceStatus === '미발급' ? 'selected' : ''}>미발급</option>
+                    <option value="발급" ${row.invoiceStatus === '발급' ? 'selected' : ''}>발급</option>
                   </select>
                 </td>
 
@@ -1783,6 +1798,7 @@
           cgDailyWage: round.cgDailyWage || 140000,
           payoutAmount: round.fullPayoutAmount || 0,
           payoutStatus: round.isPayoutPaid ? '지급완료' : '지급전',
+          invoiceStatus: round.existingPayout && round.existingPayout.invoiceStatus || '미발급',
           claimId: round.existingClaim && round.existingClaim.id || '',
           payoutId: round.existingPayout && round.existingPayout.id || '',
           caregiverName: round.caregiverName || '',
@@ -1978,6 +1994,7 @@
             depositStatus: round.isClaimDeposited ? '입금완료' : (round.depositAmount > 0 ? '부분입금' : '미입금'),
             cgDailyWage: round.cgDailyWage || 140000, payoutAmount: round.fullPayoutAmount || 0,
             payoutStatus: round.isPayoutPaid ? '지급완료' : '지급전',
+            invoiceStatus: round.existingPayout && round.existingPayout.invoiceStatus || '미발급',
             claimId: round.existingClaim && round.existingClaim.id || '',
             payoutId: round.existingPayout && round.existingPayout.id || '',
             caregiverName: round.caregiverName || '', memo: round.memo || ''
@@ -2229,9 +2246,14 @@
     const rowKey = `${appId}_${setIndex}`;
 
     const app = (window.gApps || []).find(a => String(a.id) === String(appId));
-    if (!app || !Array.isArray(app.customSettlementSets)) return;
+    if (!app) return;
+    if (!Array.isArray(app.customSettlementSets)) app.customSettlementSets = [];
 
-    const cSet = app.customSettlementSets.find(s => Number(s.setIndex) === Number(setIndex));
+    let cSet = app.customSettlementSets.find(s => Number(s.setIndex) === Number(setIndex));
+    if (!cSet && field === 'invoiceStatus') {
+      cSet = gHyundaiNewClaimOnlySets.get(`${appId}_${setIndex}`) || null;
+      if (cSet) app.customSettlementSets.push(cSet);
+    }
     if (!cSet) return;
 
     cSet[field] = newStatus;
@@ -2267,6 +2289,10 @@
       if (newStatus === '지급완료' && !cSet.payoutDate) {
         cSet.payoutDate = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
       }
+    } else if (field === 'invoiceStatus') {
+      selectEl.className = `px-2 py-1 text-[10px] font-bold rounded-md border shadow-2xs focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer ${
+        newStatus === '발급' ? 'text-emerald-700 bg-emerald-50 border-emerald-300' : 'text-slate-700 bg-slate-50 border-slate-300'
+      }`;
     }
 
     flashCellSuccess(selectEl);
@@ -2420,6 +2446,7 @@
           dailyWage: cSet.cgDailyWage || 130000,
           payoutAmount: cSet.payoutAmount || 0,
           payoutStatus: cSet.payoutStatus || '지급전',
+          invoiceStatus: cSet.invoiceStatus || '미발급',
           memo: cSet.memo || ''
         };
         if (Array.isArray(window.gPayouts)) window.gPayouts.unshift(matchedPayout);
@@ -2434,6 +2461,7 @@
         matchedPayout.dailyWage = cSet.cgDailyWage;
         matchedPayout.payoutAmount = cSet.payoutAmount;
         matchedPayout.payoutStatus = cSet.payoutStatus;
+        matchedPayout.invoiceStatus = cSet.invoiceStatus || '미발급';
         matchedPayout.memo = cSet.memo;
       }
 
@@ -2611,6 +2639,7 @@
       '간병인 1일 일당': r.cgDailyWage,
       '지급 대상액': r.payoutAmount,
       '지급 상태': r.payoutStatus,
+      '계산서발행여부': r.invoiceStatus,
       // 기타
       '특이사항 / 메모': r.memo
     }));
@@ -3325,6 +3354,7 @@ function calculateDuePeriods3(startDateStr, endDateStr, isEnded, as) {
             cgDailyWage: cgDailyWage,
             payoutAmount: payoutAmount,
             payoutStatus: '지급전',
+            invoiceStatus: '미발급',
             claimId: finalClaimId,
             payoutId: finalPayoutId,
             caregiverName: resolvedCgName,
@@ -3379,6 +3409,7 @@ function calculateDuePeriods3(startDateStr, endDateStr, isEnded, as) {
             dailyWage: cgDailyWage,
             payoutAmount: payoutAmount,
             payoutStatus: '지급전',
+            invoiceStatus: '미발급',
             memo: ''
           };
 

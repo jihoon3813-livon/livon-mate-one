@@ -1869,6 +1869,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         ongoingPayoutAmount: ongoingPayoutAmount,
         payoutId: cSet.payoutId || (existingPayout ? existingPayout.id : `P${String(app.id).replace('C', '')}.${setIndex}`),
         payoutStatus: payoutStatus,
+        invoiceStatus: (existingPayout && existingPayout.invoiceStatus) || cSet.invoiceStatus || '미발급',
         existingPayout: existingPayout,
         isPayoutCreated: Boolean(existingPayout),
         isPayoutPaid: isPayoutPaid,
@@ -2148,6 +2149,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           ongoingPayoutAmount: ongoingPayoutAmount,
           payoutId: payoutForRound ? payoutForRound.id : `P${String(app.id).replace('C', '')}.${setIndex}`,
           payoutStatus,
+          invoiceStatus: (payoutForRound && payoutForRound.invoiceStatus) || '미발급',
           existingPayout: payoutForRound,
           isPayoutCreated: Boolean(payoutForRound),
           isPayoutPaid,
@@ -3199,6 +3201,13 @@ function ensureSettlementSetModal() {
                   <option value="지급완료">지급완료 ✓</option>
                 </select>
               </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">계산서발행여부</label>
+                <select id="settlementSetInvoiceStatusSelect" class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500">
+                  <option value="미발급">미발급</option>
+                  <option value="발급">발급</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -3307,6 +3316,7 @@ function openSettlementSetEditModal(appId, setIndex) {
   document.getElementById('settlementSetPayoutWageInput').value = formatCurrency(r ? r.cgDailyWage : 140000);
   document.getElementById('settlementSetPayoutAmountInput').value = formatCurrency(r ? r.fullPayoutAmount : 140000);
   document.getElementById('settlementSetPayoutStatusSelect').value = (r && r.isPayoutPaid) ? '지급완료' : '지급전';
+  document.getElementById('settlementSetInvoiceStatusSelect').value = (r && (r.invoiceStatus || (r.existingPayout && r.existingPayout.invoiceStatus))) || '미발급';
 
   // Memo
   document.getElementById('settlementSetMemoInput').value = (r && r.memo) ? r.memo : (r && r.existingClaim && r.existingClaim.memo ? r.existingClaim.memo : (r && r.existingPayout && r.existingPayout.memo ? r.existingPayout.memo : ''));
@@ -3414,6 +3424,7 @@ function openSettlementSetAddModal(appId) {
   document.getElementById('settlementSetPayoutWageInput').value = formatCurrency(wage);
   document.getElementById('settlementSetPayoutAmountInput').value = formatCurrency(initialDays * wage);
   document.getElementById('settlementSetPayoutStatusSelect').value = '지급전';
+  document.getElementById('settlementSetInvoiceStatusSelect').value = '미발급';
 
   // Memo
   document.getElementById('settlementSetMemoInput').value = '';
@@ -3544,6 +3555,7 @@ async function handleSaveSettlementSet(e) {
     const cgDailyWage = parseInt(String(document.getElementById('settlementSetPayoutWageInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 140000;
     const payoutAmount = parseInt(String(document.getElementById('settlementSetPayoutAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (payoutDays * cgDailyWage);
     const payoutStatus = document.getElementById('settlementSetPayoutStatusSelect')?.value || '지급전';
+    const invoiceStatus = document.getElementById('settlementSetInvoiceStatusSelect')?.value || '미발급';
 
     const memo = document.getElementById('settlementSetMemoInput')?.value.trim() || '';
 
@@ -3576,6 +3588,7 @@ async function handleSaveSettlementSet(e) {
         cgDailyWage: r.cgDailyWage || 140000,
         payoutAmount: r.fullPayoutAmount || 140000,
         payoutStatus: r.isPayoutPaid ? '지급완료' : '지급전',
+        invoiceStatus: (r.existingPayout && r.existingPayout.invoiceStatus) || '미발급',
         claimId: r.existingClaim ? r.existingClaim.id : (r.claimId || ''),
         payoutId: r.existingPayout ? r.existingPayout.id : (r.payoutId || ''),
         caregiverName: r.caregiverName || '',
@@ -3616,6 +3629,7 @@ async function handleSaveSettlementSet(e) {
       cgDailyWage: cgDailyWage,
       payoutAmount: payoutAmount,
       payoutStatus: payoutStatus,
+      invoiceStatus: invoiceStatus,
       claimId: finalClaimId,
       payoutId: finalPayoutId,
       memo: memo
@@ -3704,6 +3718,7 @@ async function handleSaveSettlementSet(e) {
         dailyWage: setData.cgDailyWage,
         payoutAmount: setData.payoutAmount,
         payoutStatus: setData.payoutStatus,
+        invoiceStatus: setData.invoiceStatus || '미발급',
         caregiverName: resolvedCgName,
         memo: setData.memo
       };
@@ -3719,6 +3734,7 @@ async function handleSaveSettlementSet(e) {
       matchedPayout.dailyWage = setData.cgDailyWage;
       matchedPayout.payoutAmount = setData.payoutAmount;
       matchedPayout.payoutStatus = setData.payoutStatus;
+      matchedPayout.invoiceStatus = setData.invoiceStatus || '미발급';
       matchedPayout.caregiverName = resolvedCgName;
       matchedPayout.memo = setData.memo;
     }
@@ -9037,6 +9053,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                           `}
                         </div>
 
+                        <div class="pt-0.5 flex items-center justify-between text-xs">
+                          <span class="text-slate-500">계산서발행여부:</span>
+                          <span class="px-2 py-0.5 rounded-lg ${(r.invoiceStatus || '미발급') === '발급' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'} font-bold text-[11px]">
+                            ${r.invoiceStatus || '미발급'}
+                          </span>
+                        </div>
+
                         ${renderStepMemoHistoryHtml(app.id, r.roundNumber, 'payout', payoutMemos, 'orange')}
                       </div>
 
@@ -10897,6 +10920,27 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 // =========================================================================
 // PAYOUT (간병비 정산 차수) 수정 및 상태 토글 엔진
 // =========================================================================
+function ensurePayoutEditInvoiceStatusField() {
+  const existing = document.getElementById('payoutEditInvoiceStatus');
+  if (existing) return existing;
+
+  const payoutStatus = document.getElementById('payoutEditStatus');
+  const statusField = payoutStatus && payoutStatus.parentElement;
+  if (!statusField) return null;
+
+  const field = document.createElement('div');
+  field.id = 'payoutEditInvoiceStatusField';
+  field.innerHTML = `
+    <label class="block font-bold text-slate-700 mb-1">계산서발행여부</label>
+    <select id="payoutEditInvoiceStatus" class="w-full p-2.5 border rounded-xl bg-white font-black text-sm">
+      <option value="미발급">미발급</option>
+      <option value="발급">발급</option>
+    </select>
+  `;
+  statusField.insertAdjacentElement('afterend', field);
+  return document.getElementById('payoutEditInvoiceStatus');
+}
+
 function openPayoutEditModal(payoutId) {
   const p = (gPayouts || []).find(item => item.id === payoutId);
   if (!p) {
@@ -10913,6 +10957,8 @@ function openPayoutEditModal(payoutId) {
   document.getElementById('payoutEditDailyWage').value = formatCurrency(p.dailyWage || 130000);
   document.getElementById('payoutEditAmount').value = formatCurrency(p.payoutAmount || ((p.days || 1) * (p.dailyWage || 130000)));
   document.getElementById('payoutEditStatus').value = p.payoutStatus || '지급';
+  const invoiceStatusSelect = ensurePayoutEditInvoiceStatusField();
+  if (invoiceStatusSelect) invoiceStatusSelect.value = p.invoiceStatus || '미발급';
   document.getElementById('payoutEditMemo').value = p.memo || '';
 
   openModal('payoutEditModal');
@@ -10939,18 +10985,27 @@ function handlePayoutEditSubmit(e) {
   const wage = Number((document.getElementById('payoutEditDailyWage')?.value || '').replace(/[^0-9]/g, '')) || 130000;
   const amount = Number((document.getElementById('payoutEditAmount')?.value || '').replace(/[^0-9]/g, '')) || (days * wage);
   const status = document.getElementById('payoutEditStatus')?.value || '지급';
+  const invoiceStatus = document.getElementById('payoutEditInvoiceStatus')?.value || '미발급';
   const memo = document.getElementById('payoutEditMemo')?.value?.trim() || '';
 
   p.days = days;
   p.dailyWage = wage;
   p.payoutAmount = amount;
   p.payoutStatus = status;
+  p.invoiceStatus = invoiceStatus;
   p.memo = memo;
   p.updatedAt = new Date().toISOString();
 
   // 고객 원장 반영
   const app = (gApps || []).find(a => a.id === p.applyId);
   if (app) {
+    if (Array.isArray(app.customSettlementSets)) {
+      const matchedSet = app.customSettlementSets.find(set =>
+        String(set.payoutId || '') === String(p.id) ||
+        (String(set.payoutRound || '').trim() && String(set.payoutRound).trim() === String(p.round || '').trim())
+      );
+      if (matchedSet) matchedSet.invoiceStatus = invoiceStatus;
+    }
     const totalAppPayout = (gPayouts || []).filter(item => item.applyId === app.id).reduce((sum, item) => sum + (item.payoutAmount || 0), 0);
     app.totalPayout = totalAppPayout;
     app.updatedAt = new Date().toISOString();
