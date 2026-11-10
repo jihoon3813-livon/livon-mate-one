@@ -7436,6 +7436,139 @@ function openCareScheduleEditModal(appId, assignId) {
 }
 window.openCareScheduleEditModal = openCareScheduleEditModal;
 
+async function registerCaregiverToCarePortFromHub(appId, assignId) {
+  const notify = options => {
+    if (typeof window.showCustomAlert === 'function') return window.showCustomAlert(options);
+    alert(options.message || options.title || 'CarePort 처리 결과를 확인할 수 없습니다.');
+    return Promise.resolve(true);
+  };
+  const app = (window.gApps || []).find(item => String(item && item.id) === String(appId));
+  const assignment = (window.gAssigns || []).find(item => String(item && item.id) === String(assignId) &&
+    String(item.applyId) === String(appId));
+  if (!app || !assignment || !String(assignment.caregiverName || '').trim() || assignment.caregiverName === '-') {
+    await notify({
+      title: '간병인 정보를 찾을 수 없습니다',
+      message: '현재 배정된 간병인 정보를 확인한 뒤 다시 시도해주세요.',
+      icon: 'user-round-x', iconColor: 'rose'
+    });
+    return;
+  }
+
+  const caregiver = (window.gCaregivers || []).find(item =>
+    String(item && item.name || '').trim() === String(assignment.caregiverName).trim());
+  const phone = String(assignment.phone || assignment.caregiverPhone || (caregiver && caregiver.phone) || '').replace(/\D/g, '');
+  if (!phone) {
+    await notify({
+      title: '간병인 연락처가 없습니다',
+      message: `[${assignment.caregiverName}] 간병인의 전화번호를 확인할 수 없어 CarePort 등록을 진행하지 않았습니다.`,
+      icon: 'phone-off', iconColor: 'rose'
+    });
+    return;
+  }
+
+  const company = String(app.insuranceCompany || '').trim();
+  const normalizedCompany = company.replace(/\s/g, '');
+  const groupIds = normalizedCompany.includes('SCOR')
+    ? { familyGroups: 161580191, familyMainGroups: 161580347, groupName: '영등포센터' }
+    : (normalizedCompany.includes('삼성화재')
+      ? { familyGroups: 161580424, familyMainGroups: 161580423, groupName: '삼성화재' }
+      : (normalizedCompany.includes('현대해상')
+        ? { familyGroups: 161580188, familyMainGroups: 161580187, groupName: '현대해상' }
+        : null));
+  if (!groupIds) {
+    await notify({
+      title: 'CarePort 그룹 설정을 찾을 수 없습니다',
+      message: `보험사 [${company || '미지정'}]에 대한 CarePort 그룹 설정이 없습니다.`,
+      icon: 'circle-help', iconColor: 'amber'
+    });
+    return;
+  }
+
+  const button = document.getElementById(`btnHubCarePortCaregiver-${appId}-${assignId}`);
+  if (button) {
+    button.disabled = true;
+    button.dataset.originalLabel = button.innerHTML;
+    button.innerHTML = '<i data-lucide="loader-circle" class="w-3 h-3 animate-spin"></i><span>CarePort 확인 중...</span>';
+  }
+
+  try {
+    const checkResponse = await fetch('/api/careport/caregiver?operation=check-phone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, name: null })
+    });
+    if (!checkResponse.ok) throw new Error(`CarePort 전화번호 확인 실패 (${checkResponse.status})`);
+    const checkResult = await checkResponse.json();
+    const existingCaregivers = Array.isArray(checkResult)
+      ? checkResult
+      : (Array.isArray(checkResult && checkResult.data) ? checkResult.data : []);
+    if (existingCaregivers.length) {
+      const existing = existingCaregivers[0];
+      const existingGroup = String(existing && existing.groupName || '').trim();
+      if (existingGroup === groupIds.groupName) {
+        await notify({
+          title: '이미 등록된 간병인입니다',
+          message: `[${assignment.caregiverName}] 간병인은 CarePort [${existingGroup}] 그룹에 이미 등록되어 있습니다.`,
+          icon: 'circle-check', iconColor: 'emerald'
+        });
+      } else {
+        await notify({
+          title: '다른 그룹에 등록된 간병인입니다',
+          message: `[${assignment.caregiverName}] 간병인은 CarePort [${existingGroup || '기존 그룹'}] 그룹에 이미 가입되어있는 간병인입니다 개발팀에 문의하세요.`,
+          icon: 'triangle-alert', iconColor: 'amber'
+        });
+      }
+      return;
+    }
+
+    const registerResponse = await fetch('/api/careport/caregiver?operation=register-caregiver', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        login_pw: '123456789',
+        user_name: String(assignment.caregiverName).trim(),
+        jumin: '000101',
+        sex: '2',
+        mobile: phone,
+        tel: phone,
+        zip: '08592',
+        address_basic: '서울 금천구 가산디지털2로 34',
+        address_detail: '',
+        care_auth_group: 'CP_107',
+        familyMainGroups: groupIds.familyMainGroups,
+        consultant_role: '간병인',
+        familyGroups: groupIds.familyGroups,
+        mtype: 5,
+        status: 'NEW'
+      })
+    });
+    const registerResult = await registerResponse.json().catch(() => null);
+    if (!registerResponse.ok || (registerResult && (registerResult.success === false || registerResult.status === 'error'))) {
+      throw new Error(`CarePort 간병인 등록 실패${registerResponse.status ? ` (${registerResponse.status})` : ''}`);
+    }
+    await notify({
+      title: 'CarePort 간병인 등록 완료',
+      message: `[${assignment.caregiverName}] 간병인을 CarePort [${groupIds.groupName}] 그룹에 등록했습니다.`,
+      icon: 'user-check', iconColor: 'emerald'
+    });
+  } catch (error) {
+    console.warn('[CareHub CarePort caregiver registration]', error);
+    await notify({
+      title: 'CarePort 등록을 완료하지 못했습니다',
+      message: error.message || 'CarePort 확인 또는 등록 중 오류가 발생했습니다.',
+      icon: 'triangle-alert', iconColor: 'rose'
+    });
+  } finally {
+    if (button && button.isConnected) {
+      button.disabled = false;
+      button.innerHTML = button.dataset.originalLabel || '<i data-lucide="cloud-upload" class="w-3 h-3"></i><span>CarePort 간병인 등록</span>';
+      delete button.dataset.originalLabel;
+      if (typeof window.initIcons === 'function') window.initIcons(button);
+    }
+  }
+}
+window.registerCaregiverToCarePortFromHub = registerCaregiverToCarePortFromHub;
+
 /**
  * [NEW] 시계열 정산·청구 라이프사이클 연동 원스탑 워크스페이스 렌더러
  * 시계열 순서: 간병제공 ➡️ 보험금 청구 ➡️ 입금 확인 ➡️ 간병비 지급
@@ -7850,6 +7983,12 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
                 ${hasAssign ? `
+                  ${as && as.caregiverName && as.caregiverName !== '-' ? `
+                    <button type="button" id="btnHubCarePortCaregiver-${app.id}-${as.id}" onclick="registerCaregiverToCarePortFromHub('${app.id}', '${as.id}')"
+                      class="px-2.5 py-1 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap" title="현재 배정 간병인을 CarePort에 확인하고 필요 시 등록">
+                      <i data-lucide="cloud-upload" class="w-3 h-3"></i> <span>CarePort 간병인 등록</span>
+                    </button>
+                  ` : ''}
                   <button type="button" onclick="openNewAssignModal('${app.id}', true)" 
                     class="px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap" title="간병인 교체">
                     <i data-lucide="refresh-cw" class="w-3 h-3"></i> <span>간병인 교체</span>

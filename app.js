@@ -35626,7 +35626,13 @@ function handleCareScheduleSubmit(e) {
 
   // Convex Cloud 운영 DB 실시간 동기화
   if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:saveAssignment', { assign: as });
+    syncToConvex('sync:saveAssignment', { assign: as })
+      .then(result => {
+        if (!result || result.status === 'error') return null;
+        if (typeof requestCarePortAssignmentAfterConvexSave !== 'function') return null;
+        return requestCarePortAssignmentAfterConvexSave(as, app);
+      })
+      .catch(error => console.warn('[CarePort schedule update] 후속 연동 실패:', error));
     if (app) syncToConvex('sync:saveApplication', { app: app });
   }
 

@@ -456,7 +456,15 @@
           existingClaim: claim
         };
         const modalClaimDisplay = getModalClaimDisplay(app, displayRound);
-        const explicitPendingSet = Boolean(claimSet && String(claimSet.claimStatus || '').trim() === '청구전' && !String(claimSet.claimDate || '').trim());
+        const claimHasCompletionEvidence = Boolean(claim && (
+          String(claim.claimDate || '').trim() ||
+          String(claim.faxSentDate || '').trim() ||
+          claim.faxStatus === '전송완료' ||
+          ['청구완료', '청구접수', '입금완료', '수납완료'].includes(String(claim.adjusterStatus || '').trim()) ||
+          ['청구완료', '청구접수', '입금완료', '수납완료'].includes(String(claim.status || '').trim())
+        ));
+        const explicitPendingSet = Boolean(claimSet && String(claimSet.claimStatus || '').trim() === '청구전' &&
+          !String(claimSet.claimDate || '').trim() && !claimHasCompletionEvidence);
         const modalClaimDate = explicitPendingSet ? '' : modalClaimDisplay.claimDate;
         const claimStatus = explicitPendingSet ? '청구전' : modalClaimDisplay.claimStatus;
         const rawClaimStatus = String(claim.adjusterStatus || claim.status || '').trim();
@@ -705,7 +713,8 @@
 
       // 2) 청구 상태 필터
       if (gHyundaiNewFilter.claimStatus !== 'ALL') {
-        if (gHyundaiNewFilter.claimStatus === '청구필요' && !claimNeededByAppId.has(row.appId)) return false;
+        if (gHyundaiNewFilter.claimStatus === '청구필요' &&
+            (!claimNeededByAppId.has(row.appId) || ['청구완료', '입금완료', '수납완료'].includes(String(row.claimStatus || '').trim()))) return false;
         if (gHyundaiNewFilter.claimStatus === '청구전' && row.claimStatus !== '청구전') return false;
         if (gHyundaiNewFilter.claimStatus === '청구완료' && row.claimStatus !== '청구완료') return false;
         if (gHyundaiNewFilter.claimStatus === '바로빌 청구중...' && row.claimStatus !== '바로빌 청구중...') return false;
@@ -1255,18 +1264,13 @@
                 </td>
                 <!-- 상세와 동일한 청구완료 입력 / 청구취소(원복) 동작 -->
                 <td class="py-1 px-2 text-center bg-blue-50/20" id="cell-claimStatus-${rowKey}">
-                  ${['청구전', '청구완료'].includes(row.claimStatus) ? `
-                    <select onchange="window.handleHyundaiNewClaimStatusAction('${escapeHtml(row.appId)}', ${row.setIndex}, this)"
-                      class="px-2 py-1 text-[10px] font-bold rounded-md border shadow-2xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 ${claimStatusColor}"
-                      title="청구 상태 변경">
-                      <option value="청구전" ${row.claimStatus === '청구전' ? 'selected' : ''}>청구전</option>
-                      <option value="청구완료" ${row.claimStatus === '청구완료' ? 'selected' : ''}>청구완료</option>
-                    </select>
-                  ` : `
-                    <span class="inline-block px-2 py-1 text-[10px] font-bold rounded-md border shadow-2xs ${claimStatusColor}">
-                      ${escapeHtml(row.claimStatus || '청구전')}
-                    </span>
-                  `}
+                  <select onchange="window.handleHyundaiNewClaimStatusAction('${escapeHtml(row.appId)}', ${row.setIndex}, this)"
+                    class="px-2 py-1 text-[10px] font-bold rounded-md border shadow-2xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 ${claimStatusColor}"
+                    title="청구 상태 변경">
+                    ${!['청구전', '청구완료'].includes(row.claimStatus) ? `<option value="${escapeHtml(row.claimStatus || '청구전')}" selected>${escapeHtml(row.claimStatus || '청구전')}</option>` : ''}
+                    <option value="청구전" ${row.claimStatus === '청구전' ? 'selected' : ''}>청구전</option>
+                    <option value="청구완료" ${row.claimStatus === '청구완료' ? 'selected' : ''}>청구완료</option>
+                  </select>
                 </td>
 
                 <!-- STEP 2. 입금 -->
@@ -1730,21 +1734,21 @@
        (String(item.applyId) === String(appId) && cSet && String(item.round || '').trim() === String(cSet.claimRound || '').trim())));
     if (!app || !cSet) {
       if (selectEl && row) selectEl.value = row.claimStatus || '청구전';
-      return;
-    }
-    const currentStatus = String(row && row.claimStatus || cSet.claimStatus || (claim && (claim.adjusterStatus || claim.status)) || '청구전').trim();
-
-    if (['입금완료', '수납완료'].includes(currentStatus) ||
-        ['입금완료', '수납완료'].includes(String(cSet.depositStatus || '').trim()) ||
-        (Number(cSet.claimAmount) > 0 && Number(cSet.depositAmount) >= Number(cSet.claimAmount))) {
-      if (selectEl) selectEl.value = currentStatus;
+      const message = !app
+        ? '신청 정보를 찾지 못해 상태를 저장하지 못했습니다. 새로고침 후 다시 시도해주세요.'
+        : '정산 세트 정보를 찾지 못해 상태를 저장하지 못했습니다. 새로고침 후 다시 시도해주세요.';
       if (typeof window.showNotification === 'function') {
-        window.showNotification({ type: 'warning', title: '청구 상태 변경 불가', message: '입금완료된 청구세트는 청구전으로 원복할 수 없습니다.' });
+        window.showNotification({ type: 'error', title: '청구 상태 저장 실패', message });
+      } else {
+        alert(message);
       }
       return;
     }
+    const currentStatus = String(row && row.claimStatus || cSet.claimStatus || (claim && (claim.adjusterStatus || claim.status)) || '청구전').trim();
+    const requestedStatus = String(selectEl && selectEl.value || currentStatus).trim();
+    if (requestedStatus === currentStatus) return;
 
-    if (currentStatus !== '청구완료') {
+    if (requestedStatus === '청구완료') {
       if (typeof window.openManualFaxClaimModal === 'function') {
         if (!Array.isArray(app.customSettlementSets) || app.customSettlementSets.length === 0) {
           const appClaims = (window.gClaims || []).filter(item => item && String(item.applyId) === String(appId));
@@ -1781,6 +1785,15 @@
         }
         window.openManualFaxClaimModal(appId, Number(setIndex));
         if (selectEl) selectEl.value = currentStatus;
+        const faxForm = document.querySelector('#manualFaxClaimModal form');
+        if (faxForm && !faxForm.dataset.hyundaiNewRefreshBound) {
+          faxForm.dataset.hyundaiNewRefreshBound = 'true';
+          faxForm.addEventListener('submit', () => {
+            window.setTimeout(() => {
+              if (window.gActiveTab === 'hyundaiclaimhubnew') renderHyundaiClaimHubNew();
+            }, 0);
+          }, true);
+        }
       } else {
         if (selectEl) selectEl.value = currentStatus;
         alert('청구완료 입력 모달을 불러올 수 없습니다. 상세 화면에서 다시 시도해주세요.');
@@ -2298,7 +2311,7 @@
       alert('청구세트 저장 중 오류가 발생했습니다: ' + err.message);
     } finally {
       gSaveInProgress.delete(saveKey);
-      setTimeout(flushHyundaiNewPendingSnapshot, 150);
+     // setTimeout(flushHyundaiNewPendingSnapshot, 150);
     }
   }
 
