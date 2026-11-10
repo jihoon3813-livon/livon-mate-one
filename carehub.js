@@ -7449,7 +7449,7 @@ async function registerCaregiverToCarePortFromHub(appId, assignId) {
     await notify({
       title: '간병인 정보를 찾을 수 없습니다',
       message: '현재 배정된 간병인 정보를 확인한 뒤 다시 시도해주세요.',
-      icon: 'user-round-x', iconColor: 'rose'
+      icon: 'user-round-x', iconColor: 'rose', theme: 'warning', category: '정보 확인'
     });
     return;
   }
@@ -7461,7 +7461,7 @@ async function registerCaregiverToCarePortFromHub(appId, assignId) {
     await notify({
       title: '간병인 연락처가 없습니다',
       message: `[${assignment.caregiverName}] 간병인의 전화번호를 확인할 수 없어 CarePort 등록을 진행하지 않았습니다.`,
-      icon: 'phone-off', iconColor: 'rose'
+      icon: 'phone-off', iconColor: 'rose', theme: 'warning', category: '연락처 확인'
     });
     return;
   }
@@ -7479,7 +7479,7 @@ async function registerCaregiverToCarePortFromHub(appId, assignId) {
     await notify({
       title: 'CarePort 그룹 설정을 찾을 수 없습니다',
       message: `보험사 [${company || '미지정'}]에 대한 CarePort 그룹 설정이 없습니다.`,
-      icon: 'circle-help', iconColor: 'amber'
+      icon: 'circle-help', iconColor: 'amber', theme: 'warning', category: '그룹 설정 오류'
     });
     return;
   }
@@ -7509,13 +7509,13 @@ async function registerCaregiverToCarePortFromHub(appId, assignId) {
         await notify({
           title: '이미 등록된 간병인입니다',
           message: `[${assignment.caregiverName}] 간병인은 CarePort [${existingGroup}] 그룹에 이미 등록되어 있습니다.`,
-          icon: 'circle-check', iconColor: 'emerald'
+          icon: 'circle-check', iconColor: 'emerald', theme: 'success', category: '등록 확인'
         });
       } else {
         await notify({
           title: '다른 그룹에 등록된 간병인입니다',
           message: `[${assignment.caregiverName}] 간병인은 CarePort [${existingGroup || '기존 그룹'}] 그룹에 이미 가입되어있는 간병인입니다 개발팀에 문의하세요.`,
-          icon: 'triangle-alert', iconColor: 'amber'
+          icon: 'triangle-alert', iconColor: 'amber', theme: 'info', category: '다른 그룹 등록'
         });
       }
       return;
@@ -7549,14 +7549,14 @@ async function registerCaregiverToCarePortFromHub(appId, assignId) {
     await notify({
       title: 'CarePort 간병인 등록 완료',
       message: `[${assignment.caregiverName}] 간병인을 CarePort [${groupIds.groupName}] 그룹에 등록했습니다.`,
-      icon: 'user-check', iconColor: 'emerald'
+      icon: 'user-check', iconColor: 'emerald', theme: 'success', category: '등록 완료'
     });
   } catch (error) {
     console.warn('[CareHub CarePort caregiver registration]', error);
     await notify({
       title: 'CarePort 등록을 완료하지 못했습니다',
       message: error.message || 'CarePort 확인 또는 등록 중 오류가 발생했습니다.',
-      icon: 'triangle-alert', iconColor: 'rose'
+      icon: 'triangle-alert', iconColor: 'rose', theme: 'warning', category: '처리 오류'
     });
   } finally {
     if (button && button.isConnected) {

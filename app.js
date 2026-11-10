@@ -981,6 +981,8 @@ function openHospitalSearchModal(context = 'newApp') {
   if (input) input.value = currentVal;
   renderHospitalSearchResults();
   modal.classList.remove('hidden');
+  modal.style.removeProperty('display');
+  modal.style.display = 'flex';
   initIcons(modal);
   if (input) input.focus();
 }
