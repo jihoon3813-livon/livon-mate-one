@@ -713,8 +713,7 @@
 
       // 2) 청구 상태 필터
       if (gHyundaiNewFilter.claimStatus !== 'ALL') {
-        if (gHyundaiNewFilter.claimStatus === '청구필요' &&
-            (!claimNeededByAppId.has(row.appId) || ['청구완료', '입금완료', '수납완료'].includes(String(row.claimStatus || '').trim()))) return false;
+        if (gHyundaiNewFilter.claimStatus === '청구필요' && !claimNeededByAppId.has(row.appId)) return false;
         if (gHyundaiNewFilter.claimStatus === '청구전' && row.claimStatus !== '청구전') return false;
         if (gHyundaiNewFilter.claimStatus === '청구완료' && row.claimStatus !== '청구완료') return false;
         if (gHyundaiNewFilter.claimStatus === '바로빌 청구중...' && row.claimStatus !== '바로빌 청구중...') return false;
@@ -1479,7 +1478,12 @@
 
   async function deleteSelectedHyundaiClaims() {
     const selectedKeys = new Set(gHyundaiNewSelectedClaimIds);
-    const selectedRows = getHyundaiClaimSets().filter(row => selectedKeys.has(`${row.appId}_${row.setIndex}`));
+    const selectedRowsBySet = new Map();
+    getHyundaiClaimSets().forEach(row => {
+      const key = `${row.appId}_${row.setIndex}`;
+      if (selectedKeys.has(key) && !selectedRowsBySet.has(key)) selectedRowsBySet.set(key, row);
+    });
+    const selectedRows = Array.from(selectedRowsBySet.values());
     if (!selectedRows.length) {
       gHyundaiNewSelectedClaimIds.clear();
       renderHyundaiClaimHubNew();
@@ -1785,7 +1789,42 @@
         }
         window.openManualFaxClaimModal(appId, Number(setIndex));
         if (selectEl) selectEl.value = currentStatus;
-        const faxForm = document.querySelector('#manualFaxClaimModal form');
+        const faxModal = document.getElementById('manualFaxClaimModal');
+        const faxForm = faxModal && faxModal.querySelector('form');
+        if (faxForm && claim && claim.id) {
+          const targetClaimId = String(claim.id);
+          const prepareExistingClaimForManualSubmit = () => {
+            const claims = Array.isArray(window.gClaims) ? window.gClaims : [];
+            const targetIndex = claims.findIndex(item => item && String(item.id) === targetClaimId);
+            if (targetIndex < 0) return;
+            const targetClaim = claims[targetIndex];
+            const labelRound = parseInt(String(targetClaim.round || '').replace(/[^0-9]/g, ''), 10);
+            const idRoundMatch = String(targetClaim.id || '').match(/\.(\d+)$/);
+            const idRound = idRoundMatch ? Number(idRoundMatch[1]) : NaN;
+            // The shared manual fax form locates claims by round label or ID suffix.
+            // Normalize an existing row's round only when neither key matches this set.
+            if (labelRound !== Number(setIndex) && idRound !== Number(setIndex)) {
+              targetClaim.round = `${setIndex}차`;
+            }
+            // Put the selected existing claim first so the shared form updates it if
+            // another claim already has the same app ID and round.
+            if (targetIndex > 0) {
+              claims.splice(targetIndex, 1);
+              claims.unshift(targetClaim);
+            }
+          };
+          const removePrepareListener = () => faxForm.removeEventListener('submit', prepareExistingClaimForManualSubmit, true);
+          faxForm.addEventListener('submit', prepareExistingClaimForManualSubmit, { capture: true, once: true });
+          if (typeof MutationObserver === 'function' && faxModal) {
+            const closeObserver = new MutationObserver(() => {
+              if (faxModal.classList.contains('hidden')) {
+                removePrepareListener();
+                closeObserver.disconnect();
+              }
+            });
+            closeObserver.observe(faxModal, { attributes: true, attributeFilter: ['class'] });
+          }
+        }
         if (faxForm && !faxForm.dataset.hyundaiNewRefreshBound) {
           faxForm.dataset.hyundaiNewRefreshBound = 'true';
           faxForm.addEventListener('submit', () => {
@@ -1814,8 +1853,39 @@
       return;
     }
 
-    // claims 레코드가 있으면 상세처럼 상태를 원복한다. 레코드가 없으면
-    // 청구완료 근거인 해당 차수의 정산청구 팩스 기록을 제거한다.
+    const settlementFaxLogs = (window.gFaxLogs || []).filter(record => {
+      return record && String(record.appId) === String(appId) && isHyundaiSettlementFaxForRound(record, setIndex);
+    });
+    if (settlementFaxLogs.some(record => !record.id)) {
+      if (selectEl) selectEl.value = currentStatus;
+      alert('연결된 팩스 기록의 ID를 확인할 수 없어 청구 상태를 원복하지 않았습니다.');
+      return;
+    }
+    if (settlementFaxLogs.length && typeof window.syncToConvex !== 'function') {
+      if (selectEl) selectEl.value = currentStatus;
+      alert('팩스 기록 삭제 동기화 함수를 찾을 수 없어 청구 상태를 원복하지 않았습니다.');
+      return;
+    }
+    const deletedFaxIds = new Set();
+    for (const record of settlementFaxLogs) {
+      if (!record.id) continue;
+      try {
+        const faxResult = await window.syncToConvex('sync:deleteFaxRecord', { recordId: String(record.id) });
+        if (!faxResult || faxResult.status !== 'success') throw new Error('정산청구 팩스 기록 삭제 미확인');
+        deletedFaxIds.add(String(record.id));
+      } catch (error) {
+        console.warn('[현대해상 청구 팩스 원복 실패]', record.id, error);
+        if (selectEl) selectEl.value = currentStatus;
+        alert('정산청구 팩스 기록을 삭제하지 못해 상태를 원복하지 않았습니다. 새로고침 후 다시 시도해주세요.');
+        return;
+      }
+    }
+    if (deletedFaxIds.size) {
+      window.gFaxLogs = (window.gFaxLogs || []).filter(record => !record || !deletedFaxIds.has(String(record.id)));
+      if (typeof saveFaxLogs === 'function') saveFaxLogs();
+    }
+
+    // 청구 레코드가 있어도 완료 판단 근거인 팩스 로그를 함께 정리한 뒤 청구전으로 원복한다.
     if (claim) {
       claim.status = '청구전';
       claim.adjusterStatus = '청구전';
@@ -1836,40 +1906,6 @@
       delete appSetTarget.claimDate;
       delete appSetTarget.faxStatus;
       delete appSetTarget.faxSentDate;
-    }
-    const settlementFaxLogs = (window.gFaxLogs || []).filter(record => {
-      if (!record || String(record.appId) !== String(appId)) return false;
-      const category = String(record.category || '').trim();
-      const caseType = String(record.caseType || '').trim();
-      const isSettlementFax = category ? category === '정산청구' :
-        (caseType ? caseType === '정산청구' : String(record.caseTitle || '').includes('청구팩스'));
-      if (!isSettlementFax) return false;
-      const recordRound = Number(record.roundNumber);
-      if (Number.isFinite(recordRound) && recordRound > 0) return recordRound === Number(setIndex);
-      return Number(setIndex) === 1;
-    });
-    if (!claim) {
-      if (settlementFaxLogs.length && typeof window.syncToConvex !== 'function') {
-        if (selectEl) selectEl.value = currentStatus;
-        alert('팩스 기록 삭제 동기화 함수를 찾을 수 없어 청구 상태를 원복하지 않았습니다.');
-        return;
-      }
-      const deletedFaxIds = new Set();
-      for (const record of settlementFaxLogs) {
-        if (!record.id) continue;
-        try {
-          const faxResult = await window.syncToConvex('sync:deleteFaxRecord', { recordId: String(record.id) });
-          if (!faxResult || faxResult.status !== 'success') throw new Error('정산청구 팩스 기록 삭제 미확인');
-          deletedFaxIds.add(String(record.id));
-        } catch (error) {
-          console.warn('[현대해상 청구 팩스 원복 실패]', record.id, error);
-          if (selectEl) selectEl.value = currentStatus;
-          alert('정산청구 팩스 기록을 삭제하지 못해 상태를 원복하지 않았습니다. 새로고침 후 다시 시도해주세요.');
-          return;
-        }
-      }
-      window.gFaxLogs = (window.gFaxLogs || []).filter(record => !record || !deletedFaxIds.has(String(record.id)));
-      if (typeof saveFaxLogs === 'function') saveFaxLogs();
     }
     try {
       localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(window.gClaims || []));
