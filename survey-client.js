@@ -1156,8 +1156,8 @@ function closeSurveyDetailResponseModal() {
 function getAllCompletedResponses() {
   const respMap = new Map();
 
-  // 1) gSurveyState.targets 중 SUBMITTED인 건
-  (gSurveyState.targets || []).filter(t => t.responseStatus === 'SUBMITTED').forEach(t => {
+  // 1) gSurveyState.targets 중 SUBMITTED이거나 응답 이력(submittedAt/answers)이 있는 건
+  (gSurveyState.targets || []).filter(t => t.responseStatus === 'SUBMITTED' || Boolean(t.submittedAt) || (t.answers && Object.keys(t.answers).length > 0)).forEach(t => {
     if (isSurveyDeleted(t)) return;
     const matchedApp = findMatchedApplication(t, t);
     const cleanAppId = resolveResponseDisplayAppId(t, t);
@@ -1740,6 +1740,9 @@ async function loadSurveyMgmtData(showToastAlert = false) {
       if (prev.responseStatus === 'SUBMITTED' && merged.responseStatus !== 'SUBMITTED') {
         merged.responseStatus = 'SUBMITTED';
       }
+      if ((merged.submittedAt || (merged.answers && Object.keys(merged.answers).length > 0)) && merged.responseStatus !== 'SUBMITTED') {
+        merged.responseStatus = 'SUBMITTED';
+      }
       targetMap.set(key, merged);
     };
 
@@ -1764,6 +1767,9 @@ async function loadSurveyMgmtData(showToastAlert = false) {
     // 데이터 정제 및 설문 응답(couponPhone, 선물상태) 보강
     gSurveyState.targets = Array.from(targetMap.values()).filter(t => !isSurveyDeleted(t)).map(t => {
       if (!t) return t;
+      if ((t.submittedAt || (t.answers && Object.keys(t.answers).length > 0)) && t.responseStatus !== 'SUBMITTED') {
+        t.responseStatus = 'SUBMITTED';
+      }
       t.hospitalName = cleanSurveyHospitalName(t.hospitalName, t);
       t.careStartDate = formatSurveyDate(t.careStartDate);
       t.careEndDate = formatSurveyDate(t.careEndDate);
@@ -6256,6 +6262,9 @@ async function autoSeedSurveyTargets(options = {}) {
             const clean = {};
             for (const [k, v] of Object.entries(t)) {
               if (!k.startsWith('_')) clean[k] = v;
+            }
+            if ((clean.submittedAt || (clean.answers && Object.keys(clean.answers).length > 0)) && clean.responseStatus !== 'SUBMITTED') {
+              clean.responseStatus = 'SUBMITTED';
             }
             return clean;
           });
