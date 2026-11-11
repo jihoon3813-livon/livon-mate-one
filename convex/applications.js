@@ -12,13 +12,14 @@ export const list = query({
 export const careHubSnapshot = query({
   args: {},
   handler: async (ctx) => {
-    const [applications, assignments, claims, payouts, careLogs, faxRecords] = await Promise.all([
+    const [applications, assignments, claims, payouts, careLogs, faxRecords, samsungSheets] = await Promise.all([
       ctx.db.query("applications").order("desc").collect(),
       ctx.db.query("assignments").collect(),
       ctx.db.query("claims").collect(),
       ctx.db.query("payouts").collect(),
       ctx.db.query("careLogs").collect(),
       ctx.db.query("faxRecords").order("desc").collect(),
+      ctx.db.query("samsungSheets").collect(),
     ]);
 
     return {
@@ -29,6 +30,7 @@ export const careHubSnapshot = query({
       payouts,
       careLogs,
       faxRecords,
+      samsungSheets,
     };
   },
 });

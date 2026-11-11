@@ -795,6 +795,22 @@ function getCareProgressInfo(assign) {
   };
 }
 
+function isSuccessfulSettlementFaxForRound(record, roundNumber) {
+  if (!record || !record.sentDate || !['성공', '전송완료', '발송완료'].includes(String(record.status || '').trim())) return false;
+  const targetRound = Number(roundNumber);
+  const recordRound = Number(record.roundNumber);
+  const category = String(record.category || '').trim();
+  const caseType = String(record.caseType || '').trim();
+  const isExactSettlementCategory = category ? category === '정산청구' : caseType === '정산청구';
+  const isLegacyFirstRoundSettlementCategory = targetRound === 1 && category.includes('정산');
+  if (!isExactSettlementCategory && !isLegacyFirstRoundSettlementCategory) return false;
+
+  if (Number.isFinite(recordRound) && recordRound > 0) {
+    return recordRound === targetRound || isLegacyFirstRoundSettlementCategory;
+  }
+  return targetRound === 1;
+}
+
 // =========================================================================
 // CTI (Computer Telephony Integration) Outbound Click-to-Call Engine
 // =========================================================================
@@ -1606,9 +1622,11 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
   const defaultInsPrice = typeof getDefaultClaimUnitPrice === 'function' ? getDefaultClaimUnitPrice(app.insuranceCompany) : 160000;
   const dailyClaimPrice = (app.customDailyClaimPrice && !isNaN(Number(app.customDailyClaimPrice)) && Number(app.customDailyClaimPrice) > 0)
     ? Number(app.customDailyClaimPrice)
+    : ((app.dailyClaimPrice && !isNaN(Number(app.dailyClaimPrice)) && Number(app.dailyClaimPrice) > 0)
+      ? Number(app.dailyClaimPrice)
     : ((appClaims && appClaims.length > 0 && (appClaims[0].unitPrice || appClaims[0].dailyWage)) 
         ? (appClaims[0].unitPrice || appClaims[0].dailyWage) 
-        : defaultInsPrice);
+        : defaultInsPrice));
   
   const cgDailyWage = as ? (as.dailyWage || 140000) : 140000;
 
@@ -1851,6 +1869,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         ongoingPayoutAmount: ongoingPayoutAmount,
         payoutId: cSet.payoutId || (existingPayout ? existingPayout.id : `P${String(app.id).replace('C', '')}.${setIndex}`),
         payoutStatus: payoutStatus,
+        invoiceStatus: (existingPayout && existingPayout.invoiceStatus) || cSet.invoiceStatus || '미발급',
         existingPayout: existingPayout,
         isPayoutCreated: Boolean(existingPayout),
         isPayoutPaid: isPayoutPaid,
@@ -2009,7 +2028,10 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         }
         const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
 
-        const fullClaimAmount = claimForRound ? (Number(claimForRound.claimAmount) || (claimDays * dailyClaimPrice)) : (claimDays * dailyClaimPrice);
+        const roundDailyClaimPrice = claimForRound && Number(claimForRound.unitPrice || claimForRound.dailyWage) > 0
+          ? Number(claimForRound.unitPrice || claimForRound.dailyWage)
+          : dailyClaimPrice;
+        const fullClaimAmount = claimForRound ? (Number(claimForRound.claimAmount) || (claimDays * roundDailyClaimPrice)) : (claimDays * dailyClaimPrice);
         const fullPayoutAmount = payoutForRound ? (Number(payoutForRound.payoutAmount) || (payoutDays * roundDailyWage)) : 0;
 
         let depositAmount = (claimForRound && claimForRound.depositAmount !== undefined && claimForRound.depositAmount !== null && claimForRound.depositAmount !== '')
@@ -2025,11 +2047,10 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
 
         const targetAppId = String(app ? app.id : '');
         const faxLogList = (window._gFaxLogsByAppId && window._gFaxLogsByAppId.get(targetAppId)) || window.gFaxLogs || [];
-        const roundFaxLog = faxLogList.find(fl => 
-          String(fl.appId) === targetAppId && 
-          (fl.roundNumber === setIndex || (fl.memo && fl.memo.includes(`${setIndex}차`)) || (fl.category && fl.category.includes('정산') && setIndex === 1))
+        const roundFaxLog = faxLogList.find(fl =>
+          String(fl.appId) === targetAppId && isSuccessfulSettlementFaxForRound(fl, setIndex)
         );
-        const isFaxClaimSent = Boolean(roundFaxLog && roundFaxLog.sentDate && (roundFaxLog.status === '전송완료' || roundFaxLog.status === '발송완료' || roundFaxLog.status === '성공'));
+        const isFaxClaimSent = Boolean(roundFaxLog);
 
         let claimStatus = 'UPCOMING_WAIT';
         if (claimForRound) {
@@ -2083,7 +2104,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           }
         }
 
-        const ongoingClaimAmount = (roundStage === 'ONGOING') ? Math.min(fullClaimAmount, ongoingElapsed * dailyClaimPrice) : fullClaimAmount;
+        const ongoingClaimAmount = (roundStage === 'ONGOING') ? Math.min(fullClaimAmount, ongoingElapsed * roundDailyClaimPrice) : fullClaimAmount;
         const ongoingPayoutAmount = (roundStage === 'ONGOING') ? Math.min(fullPayoutAmount, ongoingElapsed * roundDailyWage) : fullPayoutAmount;
 
         const roundEndStdDate = (roundEndDateStr ? roundEndDateStr.slice(0, 10).replace(/-/g, '.') : '') || claimStandardDate || (payoutStandardDate ? payoutStandardDate.slice(0, 10) : '');
@@ -2110,7 +2131,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           stage: roundStage,
           ongoingElapsed: ongoingElapsed,
           ongoingRemaining: ongoingRemaining,
-          dailyClaimPrice,
+          dailyClaimPrice: roundDailyClaimPrice,
           fullClaimAmount,
           depositAmount,
           ongoingClaimAmount: ongoingClaimAmount,
@@ -2128,6 +2149,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           ongoingPayoutAmount: ongoingPayoutAmount,
           payoutId: payoutForRound ? payoutForRound.id : `P${String(app.id).replace('C', '')}.${setIndex}`,
           payoutStatus,
+          invoiceStatus: (payoutForRound && payoutForRound.invoiceStatus) || '미발급',
           existingPayout: payoutForRound,
           isPayoutCreated: Boolean(payoutForRound),
           isPayoutPaid,
@@ -3179,6 +3201,13 @@ function ensureSettlementSetModal() {
                   <option value="지급완료">지급완료 ✓</option>
                 </select>
               </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">계산서발행여부</label>
+                <select id="settlementSetInvoiceStatusSelect" class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500">
+                  <option value="미발급">미발급</option>
+                  <option value="발급">발급</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -3287,6 +3316,7 @@ function openSettlementSetEditModal(appId, setIndex) {
   document.getElementById('settlementSetPayoutWageInput').value = formatCurrency(r ? r.cgDailyWage : 140000);
   document.getElementById('settlementSetPayoutAmountInput').value = formatCurrency(r ? r.fullPayoutAmount : 140000);
   document.getElementById('settlementSetPayoutStatusSelect').value = (r && r.isPayoutPaid) ? '지급완료' : '지급전';
+  document.getElementById('settlementSetInvoiceStatusSelect').value = (r && (r.invoiceStatus || (r.existingPayout && r.existingPayout.invoiceStatus))) || '미발급';
 
   // Memo
   document.getElementById('settlementSetMemoInput').value = (r && r.memo) ? r.memo : (r && r.existingClaim && r.existingClaim.memo ? r.existingClaim.memo : (r && r.existingPayout && r.existingPayout.memo ? r.existingPayout.memo : ''));
@@ -3394,6 +3424,7 @@ function openSettlementSetAddModal(appId) {
   document.getElementById('settlementSetPayoutWageInput').value = formatCurrency(wage);
   document.getElementById('settlementSetPayoutAmountInput').value = formatCurrency(initialDays * wage);
   document.getElementById('settlementSetPayoutStatusSelect').value = '지급전';
+  document.getElementById('settlementSetInvoiceStatusSelect').value = '미발급';
 
   // Memo
   document.getElementById('settlementSetMemoInput').value = '';
@@ -3524,6 +3555,7 @@ async function handleSaveSettlementSet(e) {
     const cgDailyWage = parseInt(String(document.getElementById('settlementSetPayoutWageInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 140000;
     const payoutAmount = parseInt(String(document.getElementById('settlementSetPayoutAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (payoutDays * cgDailyWage);
     const payoutStatus = document.getElementById('settlementSetPayoutStatusSelect')?.value || '지급전';
+    const invoiceStatus = document.getElementById('settlementSetInvoiceStatusSelect')?.value || '미발급';
 
     const memo = document.getElementById('settlementSetMemoInput')?.value.trim() || '';
 
@@ -3556,6 +3588,7 @@ async function handleSaveSettlementSet(e) {
         cgDailyWage: r.cgDailyWage || 140000,
         payoutAmount: r.fullPayoutAmount || 140000,
         payoutStatus: r.isPayoutPaid ? '지급완료' : '지급전',
+        invoiceStatus: (r.existingPayout && r.existingPayout.invoiceStatus) || '미발급',
         claimId: r.existingClaim ? r.existingClaim.id : (r.claimId || ''),
         payoutId: r.existingPayout ? r.existingPayout.id : (r.payoutId || ''),
         caregiverName: r.caregiverName || '',
@@ -3596,6 +3629,7 @@ async function handleSaveSettlementSet(e) {
       cgDailyWage: cgDailyWage,
       payoutAmount: payoutAmount,
       payoutStatus: payoutStatus,
+      invoiceStatus: invoiceStatus,
       claimId: finalClaimId,
       payoutId: finalPayoutId,
       memo: memo
@@ -3684,6 +3718,7 @@ async function handleSaveSettlementSet(e) {
         dailyWage: setData.cgDailyWage,
         payoutAmount: setData.payoutAmount,
         payoutStatus: setData.payoutStatus,
+        invoiceStatus: setData.invoiceStatus || '미발급',
         caregiverName: resolvedCgName,
         memo: setData.memo
       };
@@ -3699,6 +3734,7 @@ async function handleSaveSettlementSet(e) {
       matchedPayout.dailyWage = setData.cgDailyWage;
       matchedPayout.payoutAmount = setData.payoutAmount;
       matchedPayout.payoutStatus = setData.payoutStatus;
+      matchedPayout.invoiceStatus = setData.invoiceStatus || '미발급';
       matchedPayout.caregiverName = resolvedCgName;
       matchedPayout.memo = setData.memo;
     }
@@ -7400,6 +7436,139 @@ function openCareScheduleEditModal(appId, assignId) {
 }
 window.openCareScheduleEditModal = openCareScheduleEditModal;
 
+async function registerCaregiverToCarePortFromHub(appId, assignId) {
+  const notify = options => {
+    if (typeof window.showCustomAlert === 'function') return window.showCustomAlert(options);
+    alert(options.message || options.title || 'CarePort 처리 결과를 확인할 수 없습니다.');
+    return Promise.resolve(true);
+  };
+  const app = (window.gApps || []).find(item => String(item && item.id) === String(appId));
+  const assignment = (window.gAssigns || []).find(item => String(item && item.id) === String(assignId) &&
+    String(item.applyId) === String(appId));
+  if (!app || !assignment || !String(assignment.caregiverName || '').trim() || assignment.caregiverName === '-') {
+    await notify({
+      title: '간병인 정보를 찾을 수 없습니다',
+      message: '현재 배정된 간병인 정보를 확인한 뒤 다시 시도해주세요.',
+      icon: 'user-round-x', iconColor: 'rose', theme: 'warning', category: '정보 확인'
+    });
+    return;
+  }
+
+  const caregiver = (window.gCaregivers || []).find(item =>
+    String(item && item.name || '').trim() === String(assignment.caregiverName).trim());
+  const phone = String(assignment.phone || assignment.caregiverPhone || (caregiver && caregiver.phone) || '').replace(/\D/g, '');
+  if (!phone) {
+    await notify({
+      title: '간병인 연락처가 없습니다',
+      message: `[${assignment.caregiverName}] 간병인의 전화번호를 확인할 수 없어 CarePort 등록을 진행하지 않았습니다.`,
+      icon: 'phone-off', iconColor: 'rose', theme: 'warning', category: '연락처 확인'
+    });
+    return;
+  }
+
+  const company = String(app.insuranceCompany || '').trim();
+  const normalizedCompany = company.replace(/\s/g, '');
+  const groupIds = normalizedCompany.includes('SCOR')
+    ? { familyGroups: 161580191, familyMainGroups: 161580347, groupName: '영등포센터' }
+    : (normalizedCompany.includes('삼성화재')
+      ? { familyGroups: 161580424, familyMainGroups: 161580423, groupName: '삼성화재' }
+      : (normalizedCompany.includes('현대해상')
+        ? { familyGroups: 161580188, familyMainGroups: 161580187, groupName: '현대해상' }
+        : null));
+  if (!groupIds) {
+    await notify({
+      title: 'CarePort 그룹 설정을 찾을 수 없습니다',
+      message: `보험사 [${company || '미지정'}]에 대한 CarePort 그룹 설정이 없습니다.`,
+      icon: 'circle-help', iconColor: 'amber', theme: 'warning', category: '그룹 설정 오류'
+    });
+    return;
+  }
+
+  const button = document.getElementById(`btnHubCarePortCaregiver-${appId}-${assignId}`);
+  if (button) {
+    button.disabled = true;
+    button.dataset.originalLabel = button.innerHTML;
+    button.innerHTML = '<i data-lucide="loader-circle" class="w-3 h-3 animate-spin"></i><span>CarePort 확인 중...</span>';
+  }
+
+  try {
+    const checkResponse = await fetch('/api/careport/caregiver?operation=check-phone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, name: null })
+    });
+    if (!checkResponse.ok) throw new Error(`CarePort 전화번호 확인 실패 (${checkResponse.status})`);
+    const checkResult = await checkResponse.json();
+    const existingCaregivers = Array.isArray(checkResult)
+      ? checkResult
+      : (Array.isArray(checkResult && checkResult.data) ? checkResult.data : []);
+    if (existingCaregivers.length) {
+      const existing = existingCaregivers[0];
+      const existingGroup = String(existing && existing.groupName || '').trim();
+      if (existingGroup === groupIds.groupName) {
+        await notify({
+          title: '이미 등록된 간병인입니다',
+          message: `[${assignment.caregiverName}] 간병인은 CarePort [${existingGroup}] 그룹에 이미 등록되어 있습니다.`,
+          icon: 'circle-check', iconColor: 'emerald', theme: 'success', category: '등록 확인'
+        });
+      } else {
+        await notify({
+          title: '다른 그룹에 등록된 간병인입니다',
+          message: `[${assignment.caregiverName}] 간병인은 CarePort [${existingGroup || '기존 그룹'}] 그룹에 이미 가입되어있는 간병인입니다 개발팀에 문의하세요.`,
+          icon: 'triangle-alert', iconColor: 'amber', theme: 'info', category: '다른 그룹 등록'
+        });
+      }
+      return;
+    }
+
+    const registerResponse = await fetch('/api/careport/caregiver?operation=register-caregiver', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        login_pw: '123456789',
+        user_name: String(assignment.caregiverName).trim(),
+        jumin: '000101',
+        sex: '2',
+        mobile: phone,
+        tel: phone,
+        zip: '08592',
+        address_basic: '서울 금천구 가산디지털2로 34',
+        address_detail: '',
+        care_auth_group: 'CP_107',
+        familyMainGroups: groupIds.familyMainGroups,
+        consultant_role: '간병인',
+        familyGroups: groupIds.familyGroups,
+        mtype: 5,
+        status: 'NEW'
+      })
+    });
+    const registerResult = await registerResponse.json().catch(() => null);
+    if (!registerResponse.ok || (registerResult && (registerResult.success === false || registerResult.status === 'error'))) {
+      throw new Error(`CarePort 간병인 등록 실패${registerResponse.status ? ` (${registerResponse.status})` : ''}`);
+    }
+    await notify({
+      title: 'CarePort 간병인 등록 완료',
+      message: `[${assignment.caregiverName}] 간병인을 CarePort [${groupIds.groupName}] 그룹에 등록했습니다.`,
+      icon: 'user-check', iconColor: 'emerald', theme: 'success', category: '등록 완료'
+    });
+  } catch (error) {
+    console.warn('[CareHub CarePort caregiver registration]', error);
+    await notify({
+      title: 'CarePort 등록을 완료하지 못했습니다',
+      message: error.message || 'CarePort 확인 또는 등록 중 오류가 발생했습니다.',
+      icon: 'triangle-alert', iconColor: 'rose', theme: 'warning', category: '처리 오류'
+    });
+  } finally {
+    if (button && button.isConnected) {
+      button.disabled = false;
+      button.innerHTML = button.dataset.originalLabel || '<i data-lucide="cloud-upload" class="w-3 h-3"></i><span>CarePort 간병인 등록</span>';
+      delete button.dataset.originalLabel;
+      if (typeof window.initIcons === 'function') window.initIcons(button);
+    }
+  }
+}
+window.registerCaregiverToCarePortFromHub = registerCaregiverToCarePortFromHub;
+
 /**
  * [NEW] 시계열 정산·청구 라이프사이클 연동 원스탑 워크스페이스 렌더러
  * 시계열 순서: 간병제공 ➡️ 보험금 청구 ➡️ 입금 확인 ➡️ 간병비 지급
@@ -7754,11 +7923,12 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                       <span class="font-medium text-slate-700 text-right break-keep leading-tight text-[10.5px] max-w-[220px]">${app.accidentDetail}</span>
                     </div>
                   ` : ''}
-                  ${(app.mobility || app.docAttached) ? `
+                  ${(app.mobility || app.surgeryStatus || app.docAttached) ? `
                     <div class="flex justify-between items-center text-[10.5px]">
-                      <span class="text-slate-400">거동 / 서류첨부:</span>
+                      <span class="text-slate-400">거동 / 수술 / 서류첨부:</span>
                       <span class="font-semibold text-slate-700">
                         거동: <b class="${app.mobility === '불가' ? 'text-rose-600' : 'text-emerald-700'}">${app.mobility || '가능'}</b> · 
+                        수술: <b class="${app.surgeryStatus === '예' || app.surgeryStatus === true ? 'text-rose-600' : 'text-slate-500'}">${app.surgeryStatus === '예' || app.surgeryStatus === true ? '예' : '아니오'}</b> · 
                         서류: <b class="${app.docAttached === '예' ? 'text-blue-600' : 'text-slate-500'}">${app.docAttached || '아니오'}</b>
                       </span>
                     </div>
@@ -7813,6 +7983,12 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
                 ${hasAssign ? `
+                  ${as && as.caregiverName && as.caregiverName !== '-' ? `
+                    <button type="button" id="btnHubCarePortCaregiver-${app.id}-${as.id}" onclick="registerCaregiverToCarePortFromHub('${app.id}', '${as.id}')"
+                      class="px-2.5 py-1 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap" title="현재 배정 간병인을 CarePort에 확인하고 필요 시 등록">
+                      <i data-lucide="cloud-upload" class="w-3 h-3"></i> <span>CarePort 간병인 등록</span>
+                    </button>
+                  ` : ''}
                   <button type="button" onclick="openNewAssignModal('${app.id}', true)" 
                     class="px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap" title="간병인 교체">
                     <i data-lucide="refresh-cw" class="w-3 h-3"></i> <span>간병인 교체</span>
@@ -8480,14 +8656,15 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
             </div>
           ` : rounds.map(r => {
             const roundFaxLog = (window.gFaxLogs || []).find(fl => 
-              String(fl.appId) === String(app.id) && 
-              (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (r.roundNumber === 1 && fl.category && fl.category.includes('정산')))
+              String(fl.appId) === String(app.id) && isSuccessfulSettlementFaxForRound(fl, r.roundNumber)
             );
 
-            const rawClaimDate = r.claimDate ||
+            const hasExplicitPendingClaim = Boolean(r.existingClaim &&
+              [r.existingClaim.adjusterStatus, r.existingClaim.status].some(status => String(status || '').trim() === '청구전') &&
+              !r.existingClaim.claimDate);
+            const rawClaimDate = hasExplicitPendingClaim ? null : (r.claimDate ||
               (roundFaxLog && roundFaxLog.sentDate) ||
-              (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
-              ((r.roundNumber === 1 && faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null);
+              (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || null);
 
             // 삼성화재인 경우 간병기간(종료일 우선, 시작일 보조)을 기준으로 몇월 청구 대상인지 산출
             let targetYear = r.targetYear || '';
@@ -8529,7 +8706,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
             // 본인에게 실제로 발송된 개별 청구 메일(samsungIndividualLog)이나 정식 청구서(r.existingClaim)가 있을 때만 청구완료로 인정
             const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
             const isSamsungClaimSent = Boolean(!isRoundCancelled && (samsungIndividualLog || isCustomRoundSent));
-            const isClaimPending = Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
+            const isClaimPending = hasExplicitPendingClaim || Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
             const isClaimDone = !isClaimPending && (isSamsung 
               ? (isSamsungClaimSent || Boolean(!isRoundCancelled && r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)) || Boolean(!isRoundCancelled && (r.claimDate || r.claimStatus === '청구완료')))
               : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료' || r.existingClaim.status === '청구완료')) || Boolean(rawClaimDate) || Boolean(r.claimDate || r.claimStatus === '청구완료')));
@@ -9016,6 +9193,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                           `}
                         </div>
 
+                        <div class="pt-0.5 flex items-center justify-between text-xs">
+                          <span class="text-slate-500">계산서발행여부:</span>
+                          <span class="px-2 py-0.5 rounded-lg ${(r.invoiceStatus || '미발급') === '발급' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'} font-bold text-[11px]">
+                            ${r.invoiceStatus || '미발급'}
+                          </span>
+                        </div>
+
                         ${renderStepMemoHistoryHtml(app.id, r.roundNumber, 'payout', payoutMemos, 'orange')}
                       </div>
 
@@ -9308,6 +9492,14 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
   const dailyPrice = schedule.dailyClaimPrice;
   const rounds = schedule.rounds;
   const totalPayoutSum = schedule.confirmedPayoutSum;
+
+  // 신청서 기준 간병기간 진행률 (배정이 없는 경우 표시)
+  const appStartVal = app.careStartDate || app.desiredDate || app.desiredStartDate || '';
+  const appEndVal = app.careEndDate || app.expectedEndDate || '';
+  const appProg = (!hasAssign && appStartVal) ? getCareProgressInfo({
+    startDate: appStartVal.includes(':') ? appStartVal : `${appStartVal} 09:00`,
+    endDate: appEndVal ? (appEndVal.includes(':') ? appEndVal : `${appEndVal} 09:00`) : '진행중'
+  }) : null;
 
   const appTotalClaim = (appClaims && appClaims.length > 0)
     ? appClaims.reduce((sum, c) => sum + (Number(c.claimAmount) || 0), 0)
@@ -9945,12 +10137,13 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 <div class="space-y-2">
                   ${rounds.map(r => {
                     const roundFaxLog = (window.gFaxLogs || []).find(fl => 
-                      String(fl.appId) === String(app.id) && 
-                      (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (r.roundNumber === 1 && fl.category && fl.category.includes('정산')))
+                      String(fl.appId) === String(app.id) && isSuccessfulSettlementFaxForRound(fl, r.roundNumber)
                     );
-                    const faxSentDateStr = (roundFaxLog && roundFaxLog.sentDate) ||
-                      (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
-                      ((r.roundNumber === 1 && faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null) || '';
+                    const hasExplicitPendingClaim = Boolean(r.existingClaim &&
+                      [r.existingClaim.adjusterStatus, r.existingClaim.status].some(status => String(status || '').trim() === '청구전') &&
+                      !r.existingClaim.claimDate);
+                    const faxSentDateStr = hasExplicitPendingClaim ? '' : ((roundFaxLog && roundFaxLog.sentDate) ||
+                      (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || '');
 
                     const isRoundCancelled = Boolean(app.cancelledSamsungRounds && app.cancelledSamsungRounds[r.roundNumber]);
 
@@ -9971,7 +10164,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
                     const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
                     const isSending = Boolean(window.gBarobillSendingRounds && window.gBarobillSendingRounds.has(`${app.id}_${r.roundNumber}`));
-                    const isClaimPending = Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
+                    const isClaimPending = hasExplicitPendingClaim || Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
                     const isClaimDone = !isClaimPending && (isSamsung
                       ? (!isRoundCancelled && (Boolean(samsungIndividualLog) || isCustomRoundSent || Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate))))
                       : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(faxSentDateStr)));
@@ -10867,6 +11060,27 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 // =========================================================================
 // PAYOUT (간병비 정산 차수) 수정 및 상태 토글 엔진
 // =========================================================================
+function ensurePayoutEditInvoiceStatusField() {
+  const existing = document.getElementById('payoutEditInvoiceStatus');
+  if (existing) return existing;
+
+  const payoutStatus = document.getElementById('payoutEditStatus');
+  const statusField = payoutStatus && payoutStatus.parentElement;
+  if (!statusField) return null;
+
+  const field = document.createElement('div');
+  field.id = 'payoutEditInvoiceStatusField';
+  field.innerHTML = `
+    <label class="block font-bold text-slate-700 mb-1">계산서발행여부</label>
+    <select id="payoutEditInvoiceStatus" class="w-full p-2.5 border rounded-xl bg-white font-black text-sm">
+      <option value="미발급">미발급</option>
+      <option value="발급">발급</option>
+    </select>
+  `;
+  statusField.insertAdjacentElement('afterend', field);
+  return document.getElementById('payoutEditInvoiceStatus');
+}
+
 function openPayoutEditModal(payoutId) {
   const p = (gPayouts || []).find(item => item.id === payoutId);
   if (!p) {
@@ -10883,6 +11097,8 @@ function openPayoutEditModal(payoutId) {
   document.getElementById('payoutEditDailyWage').value = formatCurrency(p.dailyWage || 130000);
   document.getElementById('payoutEditAmount').value = formatCurrency(p.payoutAmount || ((p.days || 1) * (p.dailyWage || 130000)));
   document.getElementById('payoutEditStatus').value = p.payoutStatus || '지급';
+  const invoiceStatusSelect = ensurePayoutEditInvoiceStatusField();
+  if (invoiceStatusSelect) invoiceStatusSelect.value = p.invoiceStatus || '미발급';
   document.getElementById('payoutEditMemo').value = p.memo || '';
 
   openModal('payoutEditModal');
@@ -10909,18 +11125,27 @@ function handlePayoutEditSubmit(e) {
   const wage = Number((document.getElementById('payoutEditDailyWage')?.value || '').replace(/[^0-9]/g, '')) || 130000;
   const amount = Number((document.getElementById('payoutEditAmount')?.value || '').replace(/[^0-9]/g, '')) || (days * wage);
   const status = document.getElementById('payoutEditStatus')?.value || '지급';
+  const invoiceStatus = document.getElementById('payoutEditInvoiceStatus')?.value || '미발급';
   const memo = document.getElementById('payoutEditMemo')?.value?.trim() || '';
 
   p.days = days;
   p.dailyWage = wage;
   p.payoutAmount = amount;
   p.payoutStatus = status;
+  p.invoiceStatus = invoiceStatus;
   p.memo = memo;
   p.updatedAt = new Date().toISOString();
 
   // 고객 원장 반영
   const app = (gApps || []).find(a => a.id === p.applyId);
   if (app) {
+    if (Array.isArray(app.customSettlementSets)) {
+      const matchedSet = app.customSettlementSets.find(set =>
+        String(set.payoutId || '') === String(p.id) ||
+        (String(set.payoutRound || '').trim() && String(set.payoutRound).trim() === String(p.round || '').trim())
+      );
+      if (matchedSet) matchedSet.invoiceStatus = invoiceStatus;
+    }
     const totalAppPayout = (gPayouts || []).filter(item => item.applyId === app.id).reduce((sum, item) => sum + (item.payoutAmount || 0), 0);
     app.totalPayout = totalAppPayout;
     app.updatedAt = new Date().toISOString();
@@ -12691,13 +12916,7 @@ var gHubAutoRefreshTimer = null;
 var gHubReturnRefreshPromise = null;
 var gHubTabVisibilityObserver = null;
 var gHubReturnProgressOwned = false;
-var gCareHubConvexClient = null;
-var gCareHubSnapshotUnsubscribe = null;
-var gCareHubSubscriptionPromise = null;
-var gCareHubSubscriptionUrl = '';
-var gCareHubSubscriptionGeneration = 0;
 var gCareHubSubscriptionReady = false;
-var gCareHubInitialSubscriptionResolve = null;
 var gCareHubSnapshotRenderTimer = null;
 var gCareHubSnapshotPendingRender = false;
 var gCareHubModalCloseObserver = null;
@@ -12800,7 +13019,6 @@ function applyCareHubSnapshot(snapshot) {
 }
 
 function stopCareHubCardSubscription() {
-  gCareHubSubscriptionGeneration++;
   gCareHubSnapshotPendingRender = false;
   if (gCareHubModalCloseObserver) {
     gCareHubModalCloseObserver.disconnect();
@@ -12810,93 +13028,20 @@ function stopCareHubCardSubscription() {
     clearTimeout(gCareHubSnapshotRenderTimer);
     gCareHubSnapshotRenderTimer = null;
   }
-  if (gCareHubSnapshotUnsubscribe) {
-    try { gCareHubSnapshotUnsubscribe(); } catch (e) {}
-    gCareHubSnapshotUnsubscribe = null;
-  }
-  if (gCareHubConvexClient) {
-    try { gCareHubConvexClient.close(); } catch (e) {}
-    gCareHubConvexClient = null;
-  }
-  gCareHubSubscriptionUrl = '';
-  gCareHubSubscriptionReady = false;
-  gCareHubSubscriptionPromise = null;
-  if (gCareHubInitialSubscriptionResolve) {
-    gCareHubInitialSubscriptionResolve(false);
-    gCareHubInitialSubscriptionResolve = null;
-  }
+  if (typeof window.syncAppConvexSnapshotSubscription === 'function') return window.syncAppConvexSnapshotSubscription();
+  return Promise.resolve(false);
 }
 
 function refreshCareHubSnapshotOnce() {
-  if (typeof queryConvex !== 'function') return Promise.resolve(false);
-  return queryConvex('applications:careHubSnapshot', {}).then(response => {
-    const snapshot = response && response.value ? response.value : response;
-    return applyCareHubSnapshot(snapshot);
-  }).catch(err => {
-    console.warn('[CareHub Snapshot Refresh]', err);
-    return false;
-  });
+  if (typeof window.refreshAppConvexSnapshotOnce === 'function') return window.refreshAppConvexSnapshotOnce();
+  return Promise.resolve(false);
 }
 
 function startCareHubCardSubscription() {
-  if (!isCareHubSnapshotConsumerVisible()) return Promise.resolve(false);
   if (gActiveTab === HUB_AUTO_REFRESH_PAGE_ID && gIsDataLoading && !gConvexDataApplied) return Promise.resolve(false);
-  if (gCareHubSubscriptionReady && gCareHubSnapshotUnsubscribe) return Promise.resolve(true);
-  if (gCareHubSubscriptionPromise) return gCareHubSubscriptionPromise;
-
-  const Client = window.CareHubConvexClient;
-  const convexUrl = window.CURRENT_CONVEX_URL;
-  if (typeof Client !== 'function' || !convexUrl) {
-    return refreshCareHubSnapshotOnce();
-  }
-
-  const generation = ++gCareHubSubscriptionGeneration;
-  gCareHubSubscriptionUrl = convexUrl;
-  let settled = false;
-  let timeoutId = null;
-  gCareHubSubscriptionPromise = new Promise(resolve => {
-    const settle = value => {
-      if (settled) return;
-      settled = true;
-      if (timeoutId) clearTimeout(timeoutId);
-      if (gCareHubInitialSubscriptionResolve === settle) gCareHubInitialSubscriptionResolve = null;
-      resolve(value);
-    };
-    gCareHubInitialSubscriptionResolve = settle;
-
-    try {
-      gCareHubConvexClient = new Client(convexUrl);
-      gCareHubSnapshotUnsubscribe = gCareHubConvexClient.onUpdate(
-        'applications:careHubSnapshot',
-        {},
-        snapshot => {
-          if (generation !== gCareHubSubscriptionGeneration || !isCareHubSnapshotConsumerVisible()) return;
-          if (!applyCareHubSnapshot(snapshot)) return;
-          gCareHubSubscriptionReady = true;
-          settle(true);
-        },
-        err => {
-          if (generation !== gCareHubSubscriptionGeneration) return;
-          console.warn('[CareHub Live Subscription]', err);
-          settle(false);
-          stopCareHubCardSubscription();
-        }
-      );
-      timeoutId = setTimeout(() => {
-        settle(false);
-        if (!gCareHubSubscriptionReady) stopCareHubCardSubscription();
-      }, 15000);
-    } catch (err) {
-      console.warn('[CareHub Live Subscription Init]', err);
-      settle(false);
-    }
-  }).finally(() => {
-    gCareHubSubscriptionPromise = null;
-  });
-
-  return gCareHubSubscriptionPromise;
+  if (typeof window.startAppConvexSnapshotSubscription === 'function') return window.startAppConvexSnapshotSubscription();
+  return Promise.resolve(false);
 }
-
 function showHubReturnBlockingProgress() {
   const progressModal = document.getElementById('globalProgressModal') || document.getElementById('globalCareLogProgressModal');
   if (progressModal && !progressModal.classList.contains('hidden')) return;
@@ -13181,7 +13326,7 @@ function ensureHubAutoRefreshControl() {
   installCareHubTabVisibilityObserver();
   syncHubAutoRefreshTimer();
   if (typeof window.CareHubConvexClient === 'function' && isCareHubTabVisible() &&
-      (!gIsDataLoading || gConvexDataApplied) && !gCareHubSubscriptionReady && !gCareHubSubscriptionPromise) {
+      (!gIsDataLoading || gConvexDataApplied) && !gCareHubSubscriptionReady && !gAppSnapshotSubscriptionPromise) {
     startCareHubCardSubscription();
   }
 }
@@ -15006,6 +15151,14 @@ function applyHubCustomerDetailSnapshot(appId, detail) {
   const appIndex = (gApps || []).findIndex(item => item && String(item.id) === String(appId));
   if (appIndex < 0) return false;
 
+  const currentApp = gApps[appIndex];
+  const currentUpdatedAt = Date.parse(currentApp && currentApp.updatedAt || '');
+  const incomingUpdatedAt = Date.parse(detail.application.updatedAt || '');
+  if (Number.isFinite(currentUpdatedAt) && Number.isFinite(incomingUpdatedAt) && currentUpdatedAt > incomingUpdatedAt) {
+    console.info('[Care Hub Detail Refresh] 오래된 상세 응답을 무시했습니다.', appId);
+    return false;
+  }
+
   gApps[appIndex] = detail.application;
   const normalizeApplyId = value => String(value || '').trim().replace(/^H/, 'C');
   const hasApplyId = item => item && (
@@ -15077,6 +15230,7 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
     console.error('hubCustomerDetailModal element not found!');
     return;
   }
+ // observeCareHubModalScrollRestore(modalEl);
 
   // Fallback if applyId is missing
   if (!applyId && typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
@@ -15477,5 +15631,92 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
     refreshHubCustomerDetailFromConvex(app.id, gHubModalInstanceId, targetSetIndex);
   }
 }
+
+// 고객별 청구 단가는 이후 생성하는 세트의 기본 단가로만 적용한다.
+// 기존 claims 단가와 청구금액은 수정하지 않도록 app.js의 공통 핸들러를 이 화면에서 대체한다.
+window.saveCustomerClaimPrice = async function saveCustomerClaimPriceForFutureSets() {
+  const applyId = document.getElementById('custPriceModalApplyId')?.value;
+  const inputEl = document.getElementById('custPriceModalInput');
+  const app = (gApps || []).find(a => String(a.id) === String(applyId));
+  if (!app || !inputEl) return;
+
+  const newPrice = parseInt(String(inputEl.value || '').replace(/[^0-9]/g, ''), 10);
+  if (!newPrice || !Number.isFinite(newPrice) || newPrice <= 0) {
+    alert('유효한 1일 청구 단가를 입력해주세요.');
+    return;
+  }
+
+  app.customDailyClaimPrice = newPrice;
+  app.dailyClaimPrice = newPrice;
+  app.updatedAt = new Date().toISOString();
+
+  if (typeof saveApplications === 'function') saveApplications();
+  if (typeof syncToConvex === 'function') {
+    Promise.resolve().then(() => syncToConvex('sync:saveApplication', { app })).catch(console.warn);
+  }
+
+  closeModal('customerClaimPriceModal');
+  if (String(gActiveHubModalAppId || '') === String(app.id) && typeof openHubCustomerDetailModal === 'function') {
+    openHubCustomerDetailModal(app.id);
+  }
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  if (typeof renderClaims === 'function') renderClaims();
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '청구 단가 개별 변경 완료',
+      message: `[${app.patientName}] 고객의 ${formatCurrency(newPrice)}원/일 단가가 이후 새 세트에 적용됩니다. 기존 청구 내역은 변경하지 않았습니다.`
+    });
+  } else {
+    alert(`[${app.patientName}] 고객의 새 세트부터 ${formatCurrency(newPrice)}원/일 단가를 적용합니다. 기존 청구 내역은 변경하지 않았습니다.`);
+  }
+};
+
+window.resetCustomerClaimPrice = async function resetCustomerClaimPriceForFutureSets(applyId) {
+  const app = (gApps || []).find(a => String(a.id) === String(applyId));
+  if (!app) return;
+
+  const defaultPrice = typeof getDefaultClaimUnitPrice === 'function'
+    ? getDefaultClaimUnitPrice(app.insuranceCompany)
+    : 160000;
+  const confirmed = await showCustomConfirm(
+    `[청구 단가 기본 복원]\n\n` +
+    `환자명: ${app.patientName} 님\n` +
+    `원수사: ${app.insuranceCompany}\n` +
+    `복원할 기본 약정단가: ${formatCurrency(defaultPrice)}원/일\n\n` +
+    `개별 지정 단가를 해제하고 이후 새 세트부터 기본 약정단가를 적용하시겠습니까? 기존 청구 내역은 변경되지 않습니다.`,
+    {
+      title: '기본 약정단가 복원 확인',
+      confirmText: '기본단가로 복원',
+      cancelText: '취소'
+    }
+  );
+  if (!confirmed) return;
+
+  delete app.customDailyClaimPrice;
+  app.dailyClaimPrice = defaultPrice;
+  app.updatedAt = new Date().toISOString();
+
+  if (typeof saveApplications === 'function') saveApplications();
+  if (typeof syncToConvex === 'function') {
+    Promise.resolve().then(() => syncToConvex('sync:saveApplication', { app })).catch(console.warn);
+  }
+
+  closeModal('customerClaimPriceModal');
+  if (String(gActiveHubModalAppId || '') === String(app.id) && typeof openHubCustomerDetailModal === 'function') {
+    openHubCustomerDetailModal(app.id);
+  }
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  if (typeof renderClaims === 'function') renderClaims();
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '기본 약정단가 복원 완료',
+      message: `[${app.patientName}] 고객의 기본 단가 ${formatCurrency(defaultPrice)}원/일이 이후 새 세트에 적용됩니다. 기존 청구 내역은 변경하지 않았습니다.`
+    });
+  }
+};
 
 

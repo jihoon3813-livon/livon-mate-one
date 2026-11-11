@@ -1113,6 +1113,15 @@
           <span class="h-5 px-2 rounded-md bg-orange-950 text-orange-300 font-bold text-[10px] flex items-center justify-center border border-orange-800" id="sidebarHyundaiEndedCount">종료청구</span>
         </button>
 
+        <!-- 7-2-3. 현대해상 청구관리(NEW) (청구세트 엑셀 시트 뷰 & 자동 생성 시스템) -->
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="hyundaiclaimhubnew" onclick="handleLeftMenuClick('hyundaiclaimhubnew')">
+          <div class="flex items-center space-x-3">
+            <i data-lucide="table-properties" class="w-4 h-4 flex-shrink-0 text-amber-400"></i>
+            <span class="tracking-tight font-semibold">현대해상 청구관리(NEW)</span>
+          </div>
+          <span class="h-5 px-2 rounded-md bg-amber-950 text-amber-300 font-bold text-[10px] flex items-center justify-center border border-amber-800">청구세트</span>
+        </button>
+
         <!-- 7-3. 삼성화재 콜분석 (인바운드 문의 분석 및 주간보고 시스템) -->
         <!--  삼성화재 콜분석 비활성화
         <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsungcallreport" onclick="handleLeftMenuClick('samsungcallreport')">
@@ -3543,6 +3552,11 @@
             <!-- Dynamic history table rendered by app.js -->
           </div>
         </div>
+      </section>
+
+      <!-- ==================== TAB: HYUNDAI MARINE CLAIM HUB (NEW) (현대해상 청구관리 NEW & 청구세트 시트 뷰) ==================== -->
+      <section id="tab-hyundaiclaimhubnew" class="tab-content hidden space-y-4">
+        <!-- Dynamically rendered by renderHyundaiClaimHubNew() in hyundaiclaimhub-new.js -->
       </section>
 
       <!-- ==================== TAB: SAMSUNG FIRE CALL ANALYSIS REPORT (삼성화재 간병서비스 콜분석 보고서) ==================== -->
@@ -14900,6 +14914,10 @@
                   <input type="checkbox" name="adminMenuCheck" value="hyundaiclaimhub" class="rounded text-indigo-600 focus:ring-indigo-500">
                   <span class="font-medium">현대해상 청구관리</span>
                 </label>
+                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
+                  <input type="checkbox" name="adminMenuCheck" value="hyundaiclaimhubnew" class="rounded text-indigo-600 focus:ring-indigo-500">
+                  <span class="font-medium">현대해상 청구관리(NEW)</span>
+                </label>
               </div>
             </div>
 
@@ -15436,7 +15454,7 @@
 
 
   <!-- ==================== MODAL: NATIONWIDE HOSPITAL SEARCH MODAL (네이버/전국 실시간 병원 검색) ==================== -->
-  <div id="hospitalSearchModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+  <div id="hospitalSearchModal" class="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
       <div class="p-5 bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 text-white flex items-center justify-between">
         <div class="flex items-center gap-3">
@@ -16316,6 +16334,7 @@
   <script src="carehub.js?v=20261102_1450"></script>
   <script src="carehub-convex-client.js?v=20261023_subscription"></script>
   <script src="hyundaiclaimhub.js?v=20261016_split"></script>
+  <script src="hyundaiclaimhub-new.js?v=20261028_init"></script>
   <script src="samsungclaimhub.js?v=20261019_sync"></script>
   <script src="samsung-sla.js?v=20261022_sla"></script>
   <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->

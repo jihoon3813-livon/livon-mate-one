@@ -102,7 +102,7 @@ module.exports = async (req, res) => {
       const resp = await requestHttps({
         hostname: 'admin.livon.care',
         port: 443,
-        path: `/main/consult/carenote/list?page=1&length=500&order=DESC&organization=${org.id}`,
+        path: `/main/consult/carenote/list?page=1&length=9999&order=DESC&organization=${org.id}`,
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

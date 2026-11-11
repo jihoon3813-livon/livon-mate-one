@@ -37,6 +37,7 @@ drive_sync/
 vonage_private.key
 # carecall_*_config.json
 slack_config.json
+slack_history.json
 sms_dispatch_log.json
 generated_pdfs/
 sample_*.png
